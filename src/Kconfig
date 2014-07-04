@@ -1,0 +1,34 @@
+# float type
+choice
+	prompt "float number precision"
+	default DOUBLE
+
+config DOUBLE
+	bool "double"
+	help
+	  64 bits double precision
+
+config FLOAT
+	bool "float"
+	help
+	  32 bit single precision
+
+endchoice
+
+config DEBUG_LEVEL
+	int "Debug level"
+	range 0 2
+	default 1
+	help
+	  Select 1 or 0 for a production build, level 2 may introduce
+	  considerable performance penalties.
+	  +---------------------------------------------+
+	  | level | assert() | assert_fa() | tt_debug() |
+	  +---------------------------------------------+
+	  |   0   |    -     |      -      |      -     |
+	  +---------------------------------------------+
+	  |   1   |    v     |      -      |      -     |
+	  +---------------------------------------------+
+	  |   2   |    v     |      v      |      v     |
+	  +---------------------------------------------+
+	  v: built-in	-: discarded

@@ -1,0 +1,33 @@
+# NOTE! Don't add files that are generated in specific
+# subdirectories here. Add them in the ".gitignore" file
+# in that subdirectory instead.
+
+# Normal rules
+.*
+*.o
+*.so
+*.a
+*.rej
+*.patch
+*.orig
+*~
+*.swp
+*.tmp
+
+# Top-level generic file
+/defconfig
+/tags
+/TAGS
+/ctags
+/etags
+
+# git files that we don't want to ignore even it they are dot-files
+!.gitignore
+
+# Generated include files
+include/config
+include/generated
+
+# cscope files
+cscope.*
+ncscope.*
