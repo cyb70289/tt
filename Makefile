@@ -37,7 +37,7 @@ RMDIR		:= rm -rf
 MKDIR		:= mkdir -p
 MV		:= mv -f
 SED		:= sed
-ECHO		:= echo
+ECHO		:= echo -e
 
 # Extra files to clean
 CLEAN_FILES	:=
