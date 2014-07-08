@@ -12,3 +12,7 @@ $(eval $(call make-test,$(localdir),$(testname),$(objs-$(testname))))
 testname := sort
 objs-$(testname) := sort.o
 $(eval $(call make-test,$(localdir),$(testname),$(objs-$(testname))))
+
+testname := stack
+objs-$(testname) := stack.o
+$(eval $(call make-test,$(localdir),$(testname),$(objs-$(testname))))

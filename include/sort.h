@@ -15,10 +15,10 @@ enum tt_sort_alg {
 
 /* Data array to be sorted */
 struct tt_sort_input {
-	void	*data;	/* to be sorted */
-	uint	count;	/* element count */
-	uint	size;	/* elememt size */
-	enum tt_num_type	type;		/* element numerical type */
+	void	*data;	/* Array to be sorted */
+	uint	count;	/* Element count */
+	uint	size;	/* Elememt size */
+	enum tt_num_type	type;		/* Element numerical type */
 	enum tt_sort_alg	alg;		/* Sorting algorithm */
 	int	(*cmp)(const void *v1, const void *v2);	/* Compare routine */
 	void	(*swap)(void *v1, void *v2);	/* Swap routine */

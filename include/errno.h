@@ -7,3 +7,5 @@
 #define ENOMEM		1	/* Out of memory */
 #define ESINGULAR	2	/* Singular matrix */
 #define EPARAM		3	/* Error parameter */
+#define EOVERFLOW	4	/* Overflow */
+#define EUNDERFLOW	5	/* Underflow */
