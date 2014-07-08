@@ -96,17 +96,19 @@ endif
 
 # $call(terse_cc,target)
 define terse_cc
-  [ "$(Q)" = "@" ] && $(ECHO) CC $1 || $(ECHO) > /dev/null
+  [ "$(Q)" = "@" ] && $(ECHO) CC $1 | $(SED) 's/^-e //' || $(ECHO) > /dev/null
 endef
 
 # $call(terse_ar,target)
 define terse_ar
-  [ "$(Q)" = "@" ] && $(ECHO) $(GREEN)AR $1$(COLOR_END) || $(ECHO) > /dev/null
+  [ "$(Q)" = "@" ] && $(ECHO) $(GREEN)AR $1$(COLOR_END) | $(SED) 's/^-e //' \
+	  || $(ECHO) > /dev/null
 endef
 
 # $call(terse_ld,target)
 define terse_ld
-  [ "$(Q)" = "@" ] && $(ECHO) $(YELLOW)LD $1$(COLOR_END) || $(ECHO) > /dev/null
+  [ "$(Q)" = "@" ] && $(ECHO) $(YELLOW)LD $1$(COLOR_END) | $(SED) 's/^-e //' \
+	  || $(ECHO) > /dev/null
 endef
 
 all:
