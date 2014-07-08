@@ -3,28 +3,74 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt.h>
+#include <string.h>
+#include <time.h>
+#include <sys/time.h>
 
 #include <sort.h>
 
-int data[] = { 254, 1, 60, 2, -1, 6, 8, -10, 2, 5, 7 };
+#define LEN	(64 * 1024)
+
+bool verify(tt_float *data)
+{
+	for (int i = 0; i < LEN - 1; i++)
+		if (data[i] > data[i + 1])
+			return false;
+	return true;
+}
 
 int main(void)
 {
+	tt_float *data = malloc(sizeof(tt_float) * LEN);
+	tt_float *data_save = malloc(sizeof(tt_float) * LEN);
+
+	printf("Generating %d floating numbers...\n", LEN);
+	struct timeval tv;
+	for (int i = 0; i < LEN; i++) {
+		gettimeofday(&tv, NULL);
+		srand(tv.tv_usec);
+		data[i] = rand();
+		data[i] /= ((RAND_MAX + 1.f) / 2000.f);
+		data[i] -= 1000.f;
+	}
+	memcpy(data_save, data, sizeof(tt_float) * LEN);
+	printf("Done\n\n");
+
 	struct tt_sort_input input = {
 		.data	= data,
-		.count	= ARRAY_SIZE(data),
-		.size	= sizeof(data[0]),
-		.type	= TT_NUM_SIGNED,
-		.alg	= TT_SORT_INSERT,
+		.count	= LEN,
+		.size	= sizeof(tt_float),
+		.type	= TT_NUM_FLOAT,
+		.alg	= TT_SORT_MERGE,
 		.cmp	= NULL,
 		.swap	= NULL,
 	};
 
+	memcpy(data, data_save, sizeof(tt_float) * LEN);
+	printf("Testing merge sort...\n");
+	clock_t st = clock();
 	tt_sort(&input);
-
-	for (int i = 0; i < ARRAY_SIZE(data); i++)
-		printf("%d ", data[i]);
+	if (verify(data))
+		printf("Done in %u ms\n", (uint)(clock() - st) / 1000);
+	else
+		printf("FAIL\n");
 	printf("\n");
+
+	memcpy(data, data_save, sizeof(tt_float) * LEN);
+	printf("Testing insert sort...\n");
+	input.cmp = NULL;
+	input.swap = NULL;
+	input.alg = TT_SORT_INSERT;
+	st = clock();
+	tt_sort(&input);
+	if (verify(data))
+		printf("Done in %u ms\n", (uint)(clock() - st) / 1000);
+	else
+		printf("FAIL\n");
+	printf("\n");
+
+	free(data);
+	free(data_save);
 
 	return 0;
 }
