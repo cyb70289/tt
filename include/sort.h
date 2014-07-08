@@ -22,7 +22,7 @@ struct tt_sort_input {
 	enum tt_sort_alg	alg;		/* Sorting algorithm */
 	int	(*cmp)(const void *v1, const void *v2);	/* Compare routine */
 	void	(*swap)(void *v1, void *v2);	/* Swap routine */
-	void	(*__set)(void *, const void *, uint);	/* Set value */
+	void	(*_set)(void *, const void *, uint);	/* Set value */
 };
 
 int tt_sort(struct tt_sort_input *input);
