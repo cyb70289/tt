@@ -6,18 +6,18 @@
 
 /* No side effects */
 #define tt_max(a, b)				\
-	do {					\
+	({					\
 		__typeof__(a) xyz_a = (a);	\
 		__typeof__(b) xyz_b = (b);	\
 		xyz_a > xyz_b ? xyz_a : xyz_b;	\
-	} while (0)
+	})
 
 #define tt_min(a, b)				\
-	do {					\
+	({					\
 		__typeof__(a) xyz_a = (a);	\
 		__typeof__(b) xyz_b = (b);	\
 		xyz_a < xyz_b ? xyz_a : xyz_b;	\
-	} while (0)
+	})
 
 #define ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
 
