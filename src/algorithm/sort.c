@@ -60,11 +60,74 @@ static void tt_sort_insert(struct tt_sort_input *input,
 	free(tmp);
 }
 
+/* Merge sort (non-recursive)
+ * - Time: O(n*logn)
+ * - Space: O(n)
+ */
+static void tt_sort_merge(struct tt_sort_input *input,
+		struct tt_sort_stat *stat)
+{
+	/* Allocate copy buffer */
+	void *tmpbuf = malloc(input->count * input->size);
+	stat->space += input->count;
+
+	int l = 1;	/* subarray length */
+	while (l < input->count) {
+		/* Merge [0]~[l-1] with [l]~[2l-1],
+		 *       [2l]~[3l-1] with [3l]~[4l-1], ...
+		 */
+		int head = 0, mid, end;
+		do {
+			mid = head + l - 1;
+			end = tt_min(mid + l, input->count - 1);
+
+			/* Merge [head]~[mid] with [mid+1]~[end] */
+			int p = head, p1 = head, p2 = mid + 1;
+			void *tmptr = tmpbuf;
+			void *ptr1 = dataptr(input, p1);
+			void *ptr2 = dataptr(input, p2);
+			while (p <= end) {
+				bool la = p2 > end;	/* Pick left array */
+				if (!la) {
+					if (p1 > mid) {
+						la = false;
+					} else {
+						la = input->cmp(ptr1, ptr2) < 0;
+						stat->time++;	/* Compare */
+					}
+				}
+
+				if (la) {
+					input->_set(tmptr, ptr1, input->size);
+					p1++;
+					ptr1 += input->size;
+				} else {
+					input->_set(tmptr, ptr2, input->size);
+					p2++;
+					ptr2 += input->size;
+				}
+				p++;
+				tmptr += input->size;
+				stat->time++;	/* Set */
+			}
+			memcpy(dataptr(input, head), tmpbuf,
+					(end - head + 1) * input->size);
+			stat->time += (end - head + 1);	/* Set */
+
+			head = end + 1;
+		} while (head < input->count);
+
+		l <<= 1;
+	}
+
+	free(tmpbuf);
+}
+
 static void (*tt_sort_internal[])(struct tt_sort_input *,
 		struct tt_sort_stat *stat) = {
 	[TT_SORT_INSERT]	= tt_sort_insert,
-/*	[TT_SORT_MERGE]		= tt_sort_merge,
-	[TT_SORT_HEAP]		= tt_sort_heap,
+	[TT_SORT_MERGE]		= tt_sort_merge,
+/*	[TT_SORT_HEAP]		= tt_sort_heap,
 	[TT_SORT_QUICK]		= tt_sort_quick,*/
 };
 
