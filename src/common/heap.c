@@ -61,6 +61,72 @@ static void tt_heap_heapify_max(struct tt_heap *heap, int index)
 	}
 }
 
+/* Adjust heap element */
+static void tt_heap_adjust_min(struct tt_heap *heap, int index)
+{
+	void *v = dataptr(heap, index);
+	while (index > 0) {
+		int parent = (index - 1) / 2;
+		void *pv = dataptr(heap, parent);
+		if (heap->cmp(v, pv) >= 0)
+			break;
+		heap->swap(v, pv);
+		index = parent;
+		v = pv;
+	}
+}
+
+static void tt_heap_adjust_max(struct tt_heap *heap, int index)
+{
+	void *v = dataptr(heap, index);
+	while (index > 0) {
+		int parent = (index - 1) / 2;
+		void *pv = dataptr(heap, parent);
+		if (heap->cmp(v, pv) <= 0)
+			break;
+		heap->swap(v, pv);
+		index = parent;
+		v = pv;
+	}
+}
+
+/* Adjust an existing element */
+int tt_heap_adjust(struct tt_heap *heap, int index, const void *v)
+{
+	tt_assert(index < heap->__heaplen);
+	/* Verify new value
+	 * max-heap: increase, min-heap: decrease
+	 */
+	int d = heap->cmp(dataptr(heap, index), v);
+	if (d == 0)
+		return 0;
+	if ((heap->htype == TT_HEAP_MAX && d > 0) ||
+			(heap->htype == TT_HEAP_MIN && d < 0)) {
+		tt_error("Invalid new value");
+		return -EINVAL;
+	}
+
+	heap->_adjust(heap, index);
+	return 0;
+}
+
+/* Get and remove head element */
+int tt_heap_gethead(struct tt_heap *heap, void *v)
+{
+	if (heap->__heaplen == 0)
+		return -EUNDERFLOW;
+	heap->_set(v, heap->data, heap->size);
+
+	heap->__heaplen--;
+	if (heap->__heaplen) {
+		heap->_set(heap->data,
+			heap->data + heap->__heaplen * heap->size, heap->size);
+		tt_heap_heapify(heap, 0);
+	}
+
+	return 0;
+}
+
 int tt_heap_init(struct tt_heap *heap)
 {
 	/* Set default swap, compare, set routines */
@@ -80,12 +146,14 @@ int tt_heap_init(struct tt_heap *heap)
 	}
 	heap->_set = _tt_set_select(heap->size);
 
-	if (heap->type == TT_HEAP_MIN) {
-		tt_debug("Minimal heap initialized");
+	if (heap->htype == TT_HEAP_MIN) {
+		tt_debug("Min-heap initialized");
 		heap->_heapify = tt_heap_heapify_min;
+		heap->_adjust = tt_heap_adjust_min;
 	} else {
-		tt_debug("Maximal heap initialized");
+		tt_debug("Max-heap initialized");
 		heap->_heapify = tt_heap_heapify_max;
+		heap->_adjust = tt_heap_adjust_max;
 	}
 
 	heap->__heaplen = 0;

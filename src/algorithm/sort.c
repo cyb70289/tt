@@ -139,7 +139,7 @@ static int tt_sort_heap(struct tt_sort_input *input,
 {
 	struct tt_heap heap = {
 		.data	= input->data,
-		.count	= input->count,
+		.cap	= input->count,
 		.size	= input->size,
 		.type	= TT_HEAP_MAX,
 		.cmp	= input->cmp,
@@ -150,12 +150,9 @@ static int tt_sort_heap(struct tt_sort_input *input,
 	if (ret)
 		return ret;
 
-        /* Build heap */
-	heap.__heaplen = heap.count;
-	for (int i = heap.count / 2 - 1; i >= 0; i--)
-		tt_heap_heapify(&heap, i);
+	/* Build heap */
+	tt_heap_build(&heap, heap.cap);
 
-	tt_assert(heap.__heaplen == heap.count);
 	void *head = heap.data;
 	heap.__heaplen--;
 	void *end = dataptr(&heap, heap.__heaplen);

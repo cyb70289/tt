@@ -18,4 +18,5 @@ enum tt_num_type {
 	TT_NUM_SIGNED,		/* signed integer */
 	TT_NUM_UNSIGNED,	/* unsigned integer */
 	TT_NUM_FLOAT,		/* floating point */
+	TT_NUM_USER,		/* user defined */
 };

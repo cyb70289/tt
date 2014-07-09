@@ -9,3 +9,4 @@
 #define EPARAM		3	/* Error parameter */
 #define EOVERFLOW	4	/* Overflow */
 #define EUNDERFLOW	5	/* Underflow */
+#define EINVAL		6	/* Invalid value */

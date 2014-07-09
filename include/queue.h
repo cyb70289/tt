@@ -11,6 +11,7 @@
 struct tt_queue {
 	uint	cap;	/* Maxiam elements, 0 - dynamic */
 	uint	size;	/* Byte size of each element */
+
 	uint	_count;	/* Elements count */
 	union {
 		struct {
