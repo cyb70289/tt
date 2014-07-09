@@ -16,3 +16,7 @@ $(eval $(call make-test,$(localdir),$(testname),$(objs-$(testname))))
 testname := stack_queue
 objs-$(testname) := stack_queue.o
 $(eval $(call make-test,$(localdir),$(testname),$(objs-$(testname))))
+
+testname := heap
+objs-$(testname) := heap.o
+$(eval $(call make-test,$(localdir),$(testname),$(objs-$(testname))))
