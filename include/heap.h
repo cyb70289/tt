@@ -18,10 +18,10 @@ struct tt_heap {
 	void	(*swap)(void *v1, void *v2);
 	void	(*_set)(void *, const void *, uint);
 	void	(*_heapify)(struct tt_heap *heap, int index);
-	uint	_heaplen;	/* Heapified subarray length */
+	uint	__heaplen;	/* Heapified subarray length */
 };
 
-int tt_heap_build(struct tt_heap *heap);
+int tt_heap_init(struct tt_heap *heap);
 
 static inline void tt_heap_heapify(struct tt_heap *heap, int index)
 {

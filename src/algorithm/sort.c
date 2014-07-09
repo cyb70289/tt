@@ -146,23 +146,27 @@ static int tt_sort_heap(struct tt_sort_input *input,
 		.swap	= input->swap,
 	};
 
-	int ret = tt_heap_build(&heap);
+	int ret = tt_heap_init(&heap);
 	if (ret)
 		return ret;
 
-	tt_assert(heap._heaplen == heap.count);
+        /* Build heap */
+	heap.__heaplen = heap.count;
+	for (int i = heap.count / 2 - 1; i >= 0; i--)
+		tt_heap_heapify(&heap, i);
+
+	tt_assert(heap.__heaplen == heap.count);
 	void *head = heap.data;
-	heap._heaplen--;
-	void *end = dataptr(&heap, heap._heaplen);
-	for (; heap._heaplen >= 1; heap._heaplen--) {
-		/* NOTE: Heap length is _heaplen+1 */
-		/* Swap [0] with [_heaplen] */
+	heap.__heaplen--;
+	void *end = dataptr(&heap, heap.__heaplen);
+	for (; heap.__heaplen >= 1; heap.__heaplen--) {
+		/* NOTE: Heap length is __heaplen+1 */
+		/* Swap [0] with [__heaplen] */
 		heap.swap(head, end);
 		end -= heap.size;
-		/* [_heaplen] is OK, let's heapify [0] ~ [_heaplen-1] */
+		/* [__heaplen] is OK, let's heapify [0] ~ [__heaplen-1] */
 		tt_heap_heapify(&heap, 0);
 	}
-	heap._heaplen = heap.count;
 
 	return 0;
 }

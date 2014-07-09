@@ -6,12 +6,18 @@
 #include <heap.h>
 #include <_common.h>
 
+/* Heap with N elements
+ * - Leaf elements: [N/2] ~ [N-1]
+ * - Child of element[i]: left - [i*2+1], right - [i*2+2]
+ * - Parent of element[i]: [(i-1)/2]
+ */
+
 #define dataptr(heap, i)	((heap)->data + (i) * (heap)->size)
 
 /* Heapify [index], taken [2*index+1] and [2*index+2] already heapified */
 static void tt_heap_heapify_min(struct tt_heap *heap, int index)
 {
-	while (index < heap->_heaplen / 2) {
+	while (index < heap->__heaplen / 2) {
 		/* Compare and swap with [2*index+1], [2*index+2] */
 		void *iptr = dataptr(heap, index);
 		index = index * 2 + 1;	/* Left child */
@@ -21,7 +27,7 @@ static void tt_heap_heapify_min(struct tt_heap *heap, int index)
 		void *swaptr = iptr;
 		if (heap->cmp(swaptr, lptr) > 0)
 			swaptr = lptr;
-		if (index < heap->_heaplen - 1 && heap->cmp(swaptr, rptr) > 0) {
+		if (index < heap->__heaplen - 1 && heap->cmp(swaptr, rptr) > 0) {
 			swaptr = rptr;
 			index++;	/* Right child */
 		}
@@ -34,7 +40,7 @@ static void tt_heap_heapify_min(struct tt_heap *heap, int index)
 
 static void tt_heap_heapify_max(struct tt_heap *heap, int index)
 {
-	while (index < heap->_heaplen / 2) {
+	while (index < heap->__heaplen / 2) {
 		/* Compare and swap with [2*index+1], [2*index+2] */
 		void *iptr = dataptr(heap, index);
 		index = index * 2 + 1;	/* Left child */
@@ -44,7 +50,7 @@ static void tt_heap_heapify_max(struct tt_heap *heap, int index)
 		void *swaptr = iptr;
 		if (heap->cmp(swaptr, lptr) < 0)
 			swaptr = lptr;
-		if (index < heap->_heaplen - 1 && heap->cmp(swaptr, rptr) < 0) {
+		if (index < heap->__heaplen - 1 && heap->cmp(swaptr, rptr) < 0) {
 			swaptr = rptr;
 			index++;	/* Right child */
 		}
@@ -55,7 +61,7 @@ static void tt_heap_heapify_max(struct tt_heap *heap, int index)
 	}
 }
 
-int tt_heap_build(struct tt_heap *heap)
+int tt_heap_init(struct tt_heap *heap)
 {
 	/* Set default swap, compare, set routines */
 	if (!heap->swap) {
@@ -82,10 +88,7 @@ int tt_heap_build(struct tt_heap *heap)
 		heap->_heapify = tt_heap_heapify_max;
 	}
 
-	/* Build heap */
-	heap->_heaplen = heap->count;
-        for (int i = heap->count / 2 - 1; i >= 0; i--)
-		heap->_heapify(heap, i);
+	heap->__heaplen = 0;
 
 	return 0;
 }
