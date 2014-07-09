@@ -10,8 +10,8 @@
  */
 #include <tt.h>
 #include <string.h>
-
 #include <sort.h>
+#include <heap.h>
 #include <_common.h>
 
 /* algorithm complexity statistics */
@@ -28,11 +28,14 @@ struct tt_sort_stat {
  * - Space: in-place
  * - Insert sort beats O(n*logn) algorithms on small array
  */
-static void tt_sort_insert(struct tt_sort_input *input,
+static int tt_sort_insert(struct tt_sort_input *input,
 		struct tt_sort_stat *stat)
 {
 	/* Allocate buffer for one temporary element */
 	void *tmp = malloc(input->size);
+	if (!tmp)
+		return -ENOMEM;
+	stat->space += 1;
 
 	void *p = input->data;
 	for (int i = 1; i < input->count; i++) {
@@ -58,17 +61,20 @@ static void tt_sort_insert(struct tt_sort_input *input,
 	}
 
 	free(tmp);
+	return 0;
 }
 
 /* Merge sort (non-recursive)
  * - Time: O(n*logn)
  * - Space: O(n)
  */
-static void tt_sort_merge(struct tt_sort_input *input,
+static int tt_sort_merge(struct tt_sort_input *input,
 		struct tt_sort_stat *stat)
 {
 	/* Allocate copy buffer */
 	void *tmpbuf = malloc(input->count * input->size);
+	if (!tmpbuf)
+		return -ENOMEM;
 	stat->space += input->count;
 
 	int l = 1;	/* subarray length */
@@ -121,14 +127,52 @@ static void tt_sort_merge(struct tt_sort_input *input,
 	}
 
 	free(tmpbuf);
+	return 0;
 }
 
-static void (*tt_sort_internal[])(struct tt_sort_input *,
+/* Heap sort (non-recursive)
+ * Time: O(n*logn)
+ * Space: in-place
+ */
+static int tt_sort_heap(struct tt_sort_input *input,
+		struct tt_sort_stat *stat)
+{
+	struct tt_heap heap = {
+		.data	= input->data,
+		.count	= input->count,
+		.size	= input->size,
+		.type	= TT_HEAP_MAX,
+		.cmp	= input->cmp,
+		.swap	= input->swap,
+	};
+
+	int ret = tt_heap_build(&heap);
+	if (ret)
+		return ret;
+
+	tt_assert(heap._heaplen == heap.count);
+	void *head = heap.data;
+	heap._heaplen--;
+	void *end = dataptr(&heap, heap._heaplen);
+	for (; heap._heaplen >= 1; heap._heaplen--) {
+		/* NOTE: Heap length is _heaplen+1 */
+		/* Swap [0] with [_heaplen] */
+		heap.swap(head, end);
+		end -= heap.size;
+		/* [_heaplen] is OK, let's heapify [0] ~ [_heaplen-1] */
+		tt_heap_heapify(&heap, 0);
+	}
+	heap._heaplen = heap.count;
+
+	return 0;
+}
+
+static int (*tt_sort_internal[])(struct tt_sort_input *,
 		struct tt_sort_stat *stat) = {
 	[TT_SORT_INSERT]	= tt_sort_insert,
 	[TT_SORT_MERGE]		= tt_sort_merge,
-/*	[TT_SORT_HEAP]		= tt_sort_heap,
-	[TT_SORT_QUICK]		= tt_sort_quick,*/
+	[TT_SORT_HEAP]		= tt_sort_heap,
+/*	[TT_SORT_QUICK]		= tt_sort_quick,*/
 };
 
 int tt_sort(struct tt_sort_input *input)
@@ -154,9 +198,9 @@ int tt_sort(struct tt_sort_input *input)
 
 	struct tt_sort_stat stat;
 	memset(&stat, 0, sizeof(struct tt_sort_stat));
-	tt_sort_internal[input->alg](input, &stat);
+	int ret = tt_sort_internal[input->alg](input, &stat);
 
 	tt_debug("time: %u, space: %u", stat.time, stat.space);
 
-	return 0;
+	return ret;
 }

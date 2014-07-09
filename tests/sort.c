@@ -57,6 +57,19 @@ int main(void)
 	printf("\n");
 
 	memcpy(data, data_save, sizeof(tt_float) * LEN);
+	printf("Testing heap sort...\n");
+	input.cmp = NULL;
+	input.swap = NULL;
+	input.alg = TT_SORT_HEAP;
+	st = clock();
+	tt_sort(&input);
+	if (verify(data))
+		printf("Done in %u ms\n", (uint)(clock() - st) / 1000);
+	else
+		printf("FAIL\n");
+	printf("\n");
+
+	memcpy(data, data_save, sizeof(tt_float) * LEN);
 	printf("Testing insert sort...\n");
 	input.cmp = NULL;
 	input.swap = NULL;
