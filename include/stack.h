@@ -12,9 +12,11 @@ struct tt_stack {
 	uint	cap;	/* Maxiam elements, 0 - dynamic */
 	uint	size;	/* Byte size of each element */
 	uint	_count;	/* Elements count */
-	void	*_top;	/* Stack top pointer */
 	union {
-		void		*_data;	/* Fixed array */
+		struct {
+			void	*_data;	/* Fixed array */
+			void	*_top;	/* Stack top pointer */
+		};
 		struct tt_list	_head;	/* Dynamic list */
 	};
 	int	(*_push)(struct tt_stack *stack, const void *e);

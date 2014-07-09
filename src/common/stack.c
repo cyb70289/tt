@@ -39,13 +39,12 @@ static int tt_stack_pop_array(struct tt_stack *stack, void *e)
 /* Dynamic linked stack */
 static int tt_stack_push_list(struct tt_stack *stack, const void *e)
 {
-	void *top = malloc(sizeof(struct tt_list) + stack->size);
-	if (!top)
+	void *se = malloc(sizeof(struct tt_list) + stack->size);
+	if (!se)
 		return -EOVERFLOW;
-	memcpy(top + sizeof(struct tt_list), e, stack->size);
-	tt_list_add(top, &stack->_head);
+	memcpy(se + sizeof(struct tt_list), e, stack->size);
+	tt_list_add(se, &stack->_head);
 
-	stack->_top = top;
 	stack->_count++;
 	return 0;
 }
@@ -56,11 +55,11 @@ static int tt_stack_pop_list(struct tt_stack *stack, void *e)
 		tt_debug("Underflow");
 		return -EUNDERFLOW;
 	}
-	memcpy(e, stack->_top + sizeof(struct tt_list), stack->size);
-	tt_list_del(stack->_top);
-	free(stack->_top);
+	void *top = stack->_head.prev;
+	memcpy(e, top + sizeof(struct tt_list), stack->size);
+	tt_list_del(top);
+	free(top);
 
-	stack->_top = stack->_head.prev;
 	stack->_count--;
 	return 0;
 }
@@ -83,7 +82,6 @@ int tt_stack_init(struct tt_stack *stack)
 		tt_assert(sizeof(struct tt_list) % 8 == 0);
 		/* Initialize list head */
 		tt_list_init(&stack->_head);
-		stack->_top = &stack->_head;	/* useless */
 		stack->_push = tt_stack_push_list;
 		stack->_pop = tt_stack_pop_list;
 		tt_debug("Dynamic stack created");
@@ -97,10 +95,8 @@ void tt_stack_free(struct tt_stack *stack)
 {
 	if (stack->cap) {
 		/* Free the array */
-		if (stack->_data) {
-			free(stack->_data);
-			stack->_data = NULL;
-		}
+		free(stack->_data);
+		stack->_data = NULL;
 	} else {
 		/* Free the list */
 		struct tt_list *pos, *tmp;
