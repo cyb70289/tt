@@ -10,19 +10,19 @@ enum tt_heap_type {
 };
 
 struct tt_heap {
-	void	*data;
-	uint	cap;	/* Element count */
-	uint	size;	/* Byte size of each element */
-	enum tt_num_type	type;	/* Data type */
-	enum tt_heap_type	htype;	/* Max or Min */
-	int	(*cmp)(const void *v1, const void *v2);
-	void	(*swap)(void *v1, void *v2);
+	struct tt_num		num;	/* Base number object */
 
-	void	(*_set)(void *dst, const void *src, uint size);
+	void	*data;	/* Data array */
+	uint	cap;	/* Capacity (max element count) */
+	enum tt_heap_type	htype;	/* Max or Min */
+
+	uint	__heaplen;	/* Heapified subarray length */
 	void	(*_heapify)(struct tt_heap *heap, int index);
 	void	(*_adjust)(struct tt_heap *heap, int index);
-	uint	__heaplen;	/* Heapified subarray length */
 };
+
+/* Get address of i-th element */
+#define heap_ptr(h, i)	((h)->data + (i) * (h)->num.size)
 
 int tt_heap_init(struct tt_heap *heap);
 
@@ -51,11 +51,11 @@ static inline int tt_heap_insert(struct tt_heap *heap, const void *v)
 {
 	if (heap->__heaplen == heap->cap)
 		return -EOVERFLOW;
-	heap->_set(heap->data + heap->__heaplen * heap->size, v, heap->size);
+	heap->num._set(&heap->num, heap_ptr(heap, heap->__heaplen), v);
 	heap->__heaplen++;
 	heap->_adjust(heap, heap->__heaplen - 1);
 	return 0;
 }
 
 /* Get and remove head element */
-int tt_heap_gethead(struct tt_heap *heap, void *v);
+int tt_heap_extract(struct tt_heap *heap, void *v);

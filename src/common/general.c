@@ -4,39 +4,39 @@
  */
 #include <tt.h>
 #include <string.h>
-
 #include <_common.h>
 
 /* Swap */
-static void tt_swap_8(void *v1, void *v2)
+static void tt_swap_8(const struct tt_num *num, void *v1, void *v2)
 {
 	int8_t tmp = *(int8_t *)v1;
 	*(int8_t *)v1 = *(int8_t *)v2;
 	*(int8_t *)v2 = tmp;
 }
 
-static void tt_swap_16(void *v1, void *v2)
+static void tt_swap_16(const struct tt_num *num, void *v1, void *v2)
 {
 	int16_t tmp = *(int16_t *)v1;
 	*(int16_t *)v1 = *(int16_t *)v2;
 	*(int16_t *)v2 = tmp;
 }
 
-static void tt_swap_32(void *v1, void *v2)
+static void tt_swap_32(const struct tt_num *num, void *v1, void *v2)
 {
 	int32_t tmp = *(int32_t *)v1;
 	*(int32_t *)v1 = *(int32_t *)v2;
 	*(int32_t *)v2 = tmp;
 }
 
-static void tt_swap_64(void *v1, void *v2)
+static void tt_swap_64(const struct tt_num *num, void *v1, void *v2)
 {
 	int64_t tmp = *(int64_t *)v1;
 	*(int64_t *)v1 = *(int64_t *)v2;
 	*(int64_t *)v2 = tmp;
 }
 
-void (*_tt_swap_select(uint size))(void *, void *)
+static void (*tt_swap_select(uint size))
+	(const struct tt_num *, void *, void *)
 {
 	switch (size) {
 	case 1:
@@ -58,22 +58,22 @@ void (*_tt_swap_select(uint size))(void *, void *)
 }
 
 /* Compare */
-static int tt_cmp_s8(const void *v1, const void *v2)
+static int tt_cmp_s8(const struct tt_num *num, const void *v1, const void *v2)
 {
 	return *(int8_t *)v1 - *(int8_t *)v2;
 }
 
-static int tt_cmp_s16(const void *v1, const void *v2)
+static int tt_cmp_s16(const struct tt_num *num, const void *v1, const void *v2)
 {
 	return *(int16_t *)v1 - *(int16_t *)v2;
 }
 
-static int tt_cmp_s32(const void *v1, const void *v2)
+static int tt_cmp_s32(const struct tt_num *num, const void *v1, const void *v2)
 {
 	return *(int32_t *)v1 - *(int32_t *)v2;
 }
 
-static int tt_cmp_s64(const void *v1, const void *v2)
+static int tt_cmp_s64(const struct tt_num *num, const void *v1, const void *v2)
 {
 	return *(int64_t *)v1 - *(int64_t *)v2;
 }
@@ -99,7 +99,7 @@ static int tt_cmp_s64(const void *v1, const void *v2)
  * - If v1, v2 is of same sign, return v1 - v2
  * - Otherwise, return v2
  */
-static int tt_cmp_u8(const void *v1, const void *v2)
+static int tt_cmp_u8(const struct tt_num *num, const void *v1, const void *v2)
 {
 	uint8_t u1 = *(uint8_t *)v1;
 	uint8_t u2 = *(uint8_t *)v2;
@@ -111,28 +111,29 @@ static int tt_cmp_u8(const void *v1, const void *v2)
 #endif
 }
 
-static int tt_cmp_u16(const void *v1, const void *v2)
+static int tt_cmp_u16(const struct tt_num *num, const void *v1, const void *v2)
 {
 	uint16_t u1 = *(uint16_t *)v1;
 	uint16_t u2 = *(uint16_t *)v2;
 	return u1 < u2 ? -1 : ((u1 - u2) >> 1);
 }
 
-static int tt_cmp_u32(const void *v1, const void *v2)
+static int tt_cmp_u32(const struct tt_num *num, const void *v1, const void *v2)
 {
 	uint32_t u1 = *(uint32_t *)v1;
 	uint32_t u2 = *(uint32_t *)v2;
 	return u1 < u2 ? -1 : ((u1 - u2) >> 1);
 }
 
-static int tt_cmp_u64(const void *v1, const void *v2)
+static int tt_cmp_u64(const struct tt_num *num, const void *v1, const void *v2)
 {
 	uint64_t u1 = *(uint64_t *)v1;
 	uint64_t u2 = *(uint64_t *)v2;
 	return u1 < u2 ? -1 : ((u1 - u2) >> 1);
 }
 
-static int tt_cmp_float(const void *v1, const void *v2)
+static int tt_cmp_float(const struct tt_num *num,
+		const void *v1, const void *v2)
 {
 	float f = *(float *)v1 - *(float *)v2;
 	if (_tt_is_zero(f))
@@ -143,7 +144,8 @@ static int tt_cmp_float(const void *v1, const void *v2)
 		return 1;
 }
 
-static int tt_cmp_double(const void *v1, const void *v2)
+static int tt_cmp_double(const struct tt_num *num,
+		const void *v1, const void *v2)
 {
 	double f = *(double *)v1 - *(double *)v2;
 	if (_tt_is_zero(f))
@@ -154,8 +156,8 @@ static int tt_cmp_double(const void *v1, const void *v2)
 		return 1;
 }
 
-int (*_tt_cmp_select(uint size, enum tt_num_type type))
-	(const void *, const void *)
+static int (*tt_cmp_select(uint size, enum tt_num_type type))
+	(const struct tt_num *, const void *, const void *)
 {
 	if (type == TT_NUM_FLOAT) {
 		tt_debug("%s", size == sizeof(double) ? "double" : "float");
@@ -186,32 +188,33 @@ int (*_tt_cmp_select(uint size, enum tt_num_type type))
 }
 
 /* Set */
-static void tt_set_8(void *dst, const void *src, uint size)
+static void tt_set_8(const struct tt_num *num, void *dst, const void *src)
 {
 	*(int8_t *)dst = *(int8_t *)src;
 }
 
-static void tt_set_16(void *dst, const void *src, uint size)
+static void tt_set_16(const struct tt_num *num, void *dst, const void *src)
 {
 	*(int16_t *)dst = *(int16_t *)src;
 }
 
-static void tt_set_32(void *dst, const void *src, uint size)
+static void tt_set_32(const struct tt_num *num, void *dst, const void *src)
 {
 	*(int32_t *)dst = *(int32_t *)src;
 }
 
-static void tt_set_64(void *dst, const void *src, uint size)
+static void tt_set_64(const struct tt_num *num, void *dst, const void *src)
 {
 	*(int64_t *)dst = *(int64_t *)src;
 }
 
-static void tt_set_general(void *dst, const void *src, uint size)
+static void tt_set_general(const struct tt_num *num, void *dst, const void *src)
 {
-	memcpy(dst, src, size);
+	memcpy(dst, src, num->size);
 }
 
-void (*_tt_set_select(uint size))(void *dst, const void *src, uint size)
+static void (*tt_set_select(uint size))
+	(const struct tt_num *, void *, const void *)
 {
 	switch (size) {
 	case 1:
@@ -230,4 +233,26 @@ void (*_tt_set_select(uint size))(void *dst, const void *src, uint size)
 		tt_info("General memcpy");
 		return tt_set_general;
 	}
+}
+
+/* Set default swap, compare, set routines */
+int _tt_num_select(struct tt_num *num)
+{
+	if (!num->swap) {
+		num->swap = tt_swap_select(num->size);
+		if (!num->swap) {
+			tt_error("No default swap routine");
+			return -EPARAM;
+		}
+	}
+	if (!num->cmp) {
+		num->cmp = tt_cmp_select(num->size, num->type);
+		if (!num->cmp) {
+			tt_error("No default compare routine");
+			return -EPARAM;
+		}
+	}
+	num->_set = tt_set_select(num->size);
+
+	return 0;
 }

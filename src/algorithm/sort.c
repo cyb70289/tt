@@ -20,47 +20,40 @@ struct tt_sort_stat {
 	uint	space;	/* Extra space */
 };
 
-/* &(input->data[i]) */
-#define dataptr(input, i)	((input)->data + (i) * (input)->size)
-
 /* Insert sort
  * - Time: O(n^2)
  * - Space: in-place
  * - Insert sort beats O(n*logn) algorithms on small array
  */
-static int tt_sort_insert(struct tt_sort_input *input,
-		struct tt_sort_stat *stat)
+static int tt_sort_insert(struct tt_sort_input *in, struct tt_sort_stat *stat)
 {
 	/* Allocate buffer for one temporary element */
-	void *tmp = malloc(input->size);
-	if (!tmp)
-		return -ENOMEM;
+	char tmp[in->num.size] __align(8);
 	stat->space += 1;
 
-	void *p = input->data;
-	for (int i = 1; i < input->count; i++) {
-		p += input->size;
+	void *p = in->data;
+	for (int i = 1; i < in->count; i++) {
+		p += in->num.size;
 		/* tmp = data[i] */
-		input->_set(tmp, p, input->size);
+		in->num._set(&in->num, tmp, p);
 		/* Insert data[i] into sorted list data[0] ~ data[i-1] */
-		void *q = p - input->size;
-		for (int j = i - 1; j >= 0; q -= input->size, j--) {
+		void *q = p - in->num.size;
+		for (int j = i - 1; j >= 0; q -= in->num.size, j--) {
 			stat->time++;	/* Compare */
 			/* if (tmp < data[j]) */
-			if (input->cmp(tmp, q) < 0) {
+			if (in->num.cmp(&in->num, tmp, q) < 0) {
 				/* data[j+1] = data[j] */
-				input->_set(q + input->size, q, input->size);
+				in->num._set(&in->num, q + in->num.size, q);
 				stat->time++;	/* Set */
 			} else {
 				break;
 			}
 		}
-		/* data[j+1] = *tmp */
-		input->_set(q + input->size, tmp, input->size);
+		/* data[j+1] = tmp */
+		in->num._set(&in->num, q + in->num.size, tmp);
 		stat->time++;	/* Set */
 	}
 
-	free(tmp);
 	return 0;
 }
 
@@ -68,60 +61,60 @@ static int tt_sort_insert(struct tt_sort_input *input,
  * - Time: O(n*logn)
  * - Space: O(n)
  */
-static int tt_sort_merge(struct tt_sort_input *input,
-		struct tt_sort_stat *stat)
+static int tt_sort_merge(struct tt_sort_input *in, struct tt_sort_stat *stat)
 {
 	/* Allocate copy buffer */
-	void *tmpbuf = malloc(input->count * input->size);
+	void *tmpbuf = malloc(in->count * in->num.size);
 	if (!tmpbuf)
 		return -ENOMEM;
-	stat->space += input->count;
+	stat->space += in->count;
 
 	int l = 1;	/* subarray length */
-	while (l < input->count) {
+	while (l < in->count) {
 		/* Merge [0]~[l-1] with [l]~[2l-1],
 		 *       [2l]~[3l-1] with [3l]~[4l-1], ...
 		 */
 		int head = 0, mid, end;
 		do {
 			mid = head + l - 1;
-			end = tt_min(mid + l, input->count - 1);
+			end = tt_min(mid + l, in->count - 1);
 
 			/* Merge [head]~[mid] with [mid+1]~[end] */
 			int p = head, p1 = head, p2 = mid + 1;
 			void *tmptr = tmpbuf;
-			void *ptr1 = dataptr(input, p1);
-			void *ptr2 = dataptr(input, p2);
+			void *ptr1 = sort_ptr(in, p1);
+			void *ptr2 = sort_ptr(in, p2);
 			while (p <= end) {
 				bool la = p2 > end;	/* Pick left array */
 				if (!la) {
 					if (p1 > mid) {
 						la = false;
 					} else {
-						la = input->cmp(ptr1, ptr2) < 0;
+						la = in->num.cmp(&in->num,
+								ptr1, ptr2) < 0;
 						stat->time++;	/* Compare */
 					}
 				}
 
 				if (la) {
-					input->_set(tmptr, ptr1, input->size);
+					in->num._set(&in->num, tmptr, ptr1);
 					p1++;
-					ptr1 += input->size;
+					ptr1 += in->num.size;
 				} else {
-					input->_set(tmptr, ptr2, input->size);
+					in->num._set(&in->num, tmptr, ptr2);
 					p2++;
-					ptr2 += input->size;
+					ptr2 += in->num.size;
 				}
 				p++;
-				tmptr += input->size;
+				tmptr += in->num.size;
 				stat->time++;	/* Set */
 			}
-			memcpy(dataptr(input, head), tmpbuf,
-					(end - head + 1) * input->size);
+			memcpy(sort_ptr(in, head), tmpbuf,
+					(end - head + 1) * in->num.size);
 			stat->time += (end - head + 1);	/* Set */
 
 			head = end + 1;
-		} while (head < input->count);
+		} while (head < in->count);
 
 		l <<= 1;
 	}
@@ -134,16 +127,13 @@ static int tt_sort_merge(struct tt_sort_input *input,
  * Time: O(n*logn)
  * Space: in-place
  */
-static int tt_sort_heap(struct tt_sort_input *input,
-		struct tt_sort_stat *stat)
+static int tt_sort_heap(struct tt_sort_input *in, struct tt_sort_stat *stat)
 {
 	struct tt_heap heap = {
-		.data	= input->data,
-		.cap	= input->count,
-		.size	= input->size,
-		.type	= TT_HEAP_MAX,
-		.cmp	= input->cmp,
-		.swap	= input->swap,
+		.num	= in->num,
+		.data	= in->data,
+		.cap	= in->count,
+		.htype	= TT_HEAP_MAX,
 	};
 
 	int ret = tt_heap_init(&heap);
@@ -155,12 +145,12 @@ static int tt_sort_heap(struct tt_sort_input *input,
 
 	void *head = heap.data;
 	heap.__heaplen--;
-	void *end = dataptr(&heap, heap.__heaplen);
+	void *end = sort_ptr(&heap, heap.__heaplen);
 	for (; heap.__heaplen >= 1; heap.__heaplen--) {
 		/* NOTE: Heap length is __heaplen+1 */
 		/* Swap [0] with [__heaplen] */
-		heap.swap(head, end);
-		end -= heap.size;
+		heap.num.swap(&heap.num, head, end);
+		end -= heap.num.size;
 		/* [__heaplen] is OK, let's heapify [0] ~ [__heaplen-1] */
 		tt_heap_heapify(&heap, 0);
 	}
@@ -180,22 +170,7 @@ int tt_sort(struct tt_sort_input *input)
 {
 	tt_assert(input->alg >= 0 && input->alg < TT_SORT_MAX);
 
-	/* Set default swap, compare, set routines */
-	if (!input->swap) {
-		input->swap = _tt_swap_select(input->size);
-		if (!input->swap) {
-			tt_error("No default swap routine");
-			return -EPARAM;
-		}
-	}
-	if (!input->cmp) {
-		input->cmp = _tt_cmp_select(input->size, input->type);
-		if (!input->cmp) {
-			tt_error("No default compare routine");
-			return -EPARAM;
-		}
-	}
-	input->_set = _tt_set_select(input->size);
+	_tt_num_select(&input->num);
 
 	struct tt_sort_stat stat;
 	memset(&stat, 0, sizeof(struct tt_sort_stat));

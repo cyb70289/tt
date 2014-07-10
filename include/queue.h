@@ -32,6 +32,7 @@ static inline int tt_queue_enque(struct tt_queue *queue, const void *e)
 {
 	return queue->_enque(queue, e);
 }
+
 static inline int tt_queue_deque(struct tt_queue *queue, void *e)
 {
 	return queue->_deque(queue, e);

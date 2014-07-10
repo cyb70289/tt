@@ -14,13 +14,8 @@
 		(b) = xyz_t;			\
 	} while (0)
 
-/* swap, compare, set
- * Don't catch this mess? Me too.
- */
-void (*_tt_swap_select(uint size))(void *, void *);
-int (*_tt_cmp_select(uint size, enum tt_num_type type))
-	(const void *, const void*);
-void (*_tt_set_select(uint size))(void *, const void *, uint);
+/* Select numeric handlers (compare, swap, set) */
+int _tt_num_select(struct tt_num *num);
 
 /* TODO: needs check */
 static inline bool _tt_is_zero(tt_float v)

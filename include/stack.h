@@ -9,8 +9,8 @@
 #include <list.h>
 
 struct tt_stack {
-	uint	cap;	/* Maxiam elements, 0 - dynamic */
-	uint	size;	/* Byte size of each element */
+	uint	cap;	/* Max elements, 0 - dynamic */
+	uint	size;	/* Bytes of each element */
 
 	uint	_count;	/* Elements count */
 	union {
@@ -31,6 +31,7 @@ static inline int tt_stack_push(struct tt_stack *stack, const void *e)
 {
 	return stack->_push(stack, e);
 }
+
 static inline int tt_stack_pop(struct tt_stack *stack, void *e)
 {
 	return stack->_pop(stack, e);

@@ -12,82 +12,81 @@
  * - Parent of element[i]: [(i-1)/2]
  */
 
-#define dataptr(heap, i)	((heap)->data + (i) * (heap)->size)
+/* Reverse compare */
+static int tt_heap_rcmp(const struct tt_num *num,
+		const void *v1, const void *v2)
+{
+	return -num->cmp(num, v1, v2);
+}
 
 /* Heapify [index], taken [2*index+1] and [2*index+2] already heapified */
-static void tt_heap_heapify_min(struct tt_heap *heap, int index)
+static inline void tt_heap_heapify_internal(
+		struct tt_heap *heap, int index,
+		int (*cmp)(const struct tt_num *, const void *, const void*))
 {
 	while (index < heap->__heaplen / 2) {
 		/* Compare and swap with [2*index+1], [2*index+2] */
-		void *iptr = dataptr(heap, index);
+		void *iptr = heap_ptr(heap, index);
 		index = index * 2 + 1;	/* Left child */
-		void *lptr = dataptr(heap, index);
-		void *rptr = lptr + heap->size;
+		void *lptr = heap_ptr(heap, index);
+		void *rptr = lptr + heap->num.size;
 
 		void *swaptr = iptr;
-		if (heap->cmp(swaptr, lptr) > 0)
+		if (cmp(&heap->num, swaptr, lptr) < 0)
 			swaptr = lptr;
-		if (index < heap->__heaplen - 1 && heap->cmp(swaptr, rptr) > 0) {
+		if (index < heap->__heaplen - 1 &&
+				cmp(&heap->num, swaptr, rptr) < 0) {
 			swaptr = rptr;
 			index++;	/* Right child */
 		}
 		if (swaptr != iptr)
-			heap->swap(iptr, swaptr);
+			heap->num.swap(&heap->num, iptr, swaptr);
 		else
 			break;
 	}
+}
+
+static void tt_heap_heapify_min(struct tt_heap *heap, int index)
+{
+	tt_heap_heapify_internal(heap, index, tt_heap_rcmp);
 }
 
 static void tt_heap_heapify_max(struct tt_heap *heap, int index)
 {
-	while (index < heap->__heaplen / 2) {
-		/* Compare and swap with [2*index+1], [2*index+2] */
-		void *iptr = dataptr(heap, index);
-		index = index * 2 + 1;	/* Left child */
-		void *lptr = dataptr(heap, index);
-		void *rptr = lptr + heap->size;
-
-		void *swaptr = iptr;
-		if (heap->cmp(swaptr, lptr) < 0)
-			swaptr = lptr;
-		if (index < heap->__heaplen - 1 && heap->cmp(swaptr, rptr) < 0) {
-			swaptr = rptr;
-			index++;	/* Right child */
-		}
-		if (swaptr != iptr)
-			heap->swap(iptr, swaptr);
-		else
-			break;
-	}
+	tt_heap_heapify_internal(heap, index, heap->num.cmp);
 }
 
-/* Adjust heap element */
-static void tt_heap_adjust_min(struct tt_heap *heap, int index)
+/* Rearrange element[index] to maintain heap property */
+static inline void tt_heap_adjust_internal(
+		struct tt_heap *heap, int index,
+		int (*cmp)(const struct tt_num *, const void *, const void*))
 {
-	void *v = dataptr(heap, index);
+	/* Buffer for one element */
+	char tmp[heap->num.size] __align(8);	/* C99 VLA, huha! */
+	void *v = heap_ptr(heap, index);
+	heap->num._set(&heap->num, tmp, v);
+
 	while (index > 0) {
 		int parent = (index - 1) / 2;
-		void *pv = dataptr(heap, parent);
-		if (heap->cmp(v, pv) >= 0)
+		void *pv = heap_ptr(heap, parent);
+		if (cmp(&heap->num, tmp, pv) <= 0)
 			break;
-		heap->swap(v, pv);
-		index = parent;
+		heap->num._set(&heap->num, v, pv);
 		v = pv;
+		index = parent;
 	}
+
+	heap->num._set(&heap->num, v, tmp);
+}
+
+static void tt_heap_adjust_min(struct tt_heap *heap, int index)
+{
+	tt_heap_adjust_internal(heap, index, tt_heap_rcmp);
 }
 
 static void tt_heap_adjust_max(struct tt_heap *heap, int index)
 {
-	void *v = dataptr(heap, index);
-	while (index > 0) {
-		int parent = (index - 1) / 2;
-		void *pv = dataptr(heap, parent);
-		if (heap->cmp(v, pv) <= 0)
-			break;
-		heap->swap(v, pv);
-		index = parent;
-		v = pv;
-	}
+	tt_heap_adjust_internal(heap, index, heap->num.cmp);
 }
 
 /* Adjust an existing element */
@@ -97,7 +96,7 @@ int tt_heap_adjust(struct tt_heap *heap, int index, const void *v)
 	/* Verify new value
 	 * max-heap: increase, min-heap: decrease
 	 */
-	int d = heap->cmp(dataptr(heap, index), v);
+	int d = heap->num.cmp(&heap->num, heap_ptr(heap, index), v);
 	if (d == 0)
 		return 0;
 	if ((heap->htype == TT_HEAP_MAX && d > 0) ||
@@ -111,16 +110,16 @@ int tt_heap_adjust(struct tt_heap *heap, int index, const void *v)
 }
 
 /* Get and remove head element */
-int tt_heap_gethead(struct tt_heap *heap, void *v)
+int tt_heap_extract(struct tt_heap *heap, void *v)
 {
 	if (heap->__heaplen == 0)
 		return -EUNDERFLOW;
-	heap->_set(v, heap->data, heap->size);
+	heap->num._set(&heap->num, v, heap->data);
 
 	heap->__heaplen--;
 	if (heap->__heaplen) {
-		heap->_set(heap->data,
-			heap->data + heap->__heaplen * heap->size, heap->size);
+		heap->num._set(&heap->num, heap->data,
+				heap_ptr(heap, heap->__heaplen));
 		tt_heap_heapify(heap, 0);
 	}
 
@@ -129,22 +128,9 @@ int tt_heap_gethead(struct tt_heap *heap, void *v)
 
 int tt_heap_init(struct tt_heap *heap)
 {
-	/* Set default swap, compare, set routines */
-	if (!heap->swap) {
-		heap->swap = _tt_swap_select(heap->size);
-		if (!heap->swap) {
-			tt_error("No default swap routine");
-			return -EPARAM;
-		}
-	}
-	if (!heap->cmp) {
-		heap->cmp = _tt_cmp_select(heap->size, heap->type);
-		if (!heap->cmp) {
-			tt_error("No default compare routine");
-			return -EPARAM;
-		}
-	}
-	heap->_set = _tt_set_select(heap->size);
+	int ret = _tt_num_select(&heap->num);
+	if (ret)
+		return ret;
 
 	if (heap->htype == TT_HEAP_MIN) {
 		tt_debug("Min-heap initialized");

@@ -6,7 +6,6 @@
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
-
 #include <sort.h>
 
 #define LEN	(64 * 1024)
@@ -37,13 +36,15 @@ int main(void)
 	printf("Done\n\n");
 
 	struct tt_sort_input input = {
+		.num	= {
+			.size	= sizeof(tt_float),
+			.type	= TT_NUM_FLOAT,
+			.cmp	= NULL,
+			.swap	= NULL,
+		},
 		.data	= data,
 		.count	= LEN,
-		.size	= sizeof(tt_float),
-		.type	= TT_NUM_FLOAT,
 		.alg	= TT_SORT_MERGE,
-		.cmp	= NULL,
-		.swap	= NULL,
 	};
 
 	memcpy(data, data_save, sizeof(tt_float) * LEN);
@@ -58,8 +59,8 @@ int main(void)
 
 	memcpy(data, data_save, sizeof(tt_float) * LEN);
 	printf("Testing heap sort...\n");
-	input.cmp = NULL;
-	input.swap = NULL;
+	input.num.cmp = NULL;
+	input.num.swap = NULL;
 	input.alg = TT_SORT_HEAP;
 	st = clock();
 	tt_sort(&input);
@@ -71,8 +72,8 @@ int main(void)
 
 	memcpy(data, data_save, sizeof(tt_float) * LEN);
 	printf("Testing insert sort...\n");
-	input.cmp = NULL;
-	input.swap = NULL;
+	input.num.cmp = NULL;
+	input.num.swap = NULL;
 	input.alg = TT_SORT_INSERT;
 	st = clock();
 	tt_sort(&input);

@@ -11,7 +11,7 @@ struct pair {
 	int	sv;	/* value */
 };
 
-static int kway_cmp(const void *v1, const void *v2)
+static int kway_cmp(const struct tt_num *num, const void *v1, const void *v2)
 {
 	return ((const struct pair *)v1)->sv - ((const struct pair *)v2)->sv;
 }
@@ -33,13 +33,15 @@ static void kway_merge(void)
 
 	struct pair pt[4];
 	struct tt_heap heap = {
+		.num	= {
+			.size	= sizeof(struct pair),
+			.type	= TT_NUM_USER,
+			.cmp	= kway_cmp,
+			.swap	= NULL,
+		},
 		.data	= pt,
 		.cap	= ARRAY_SIZE(pt),
-		.size	= sizeof(struct pair),
-		.type	= TT_NUM_USER,
 		.htype	= TT_HEAP_MIN,
-		.cmp	= kway_cmp,
-		.swap	= NULL,
 	};
 
 	tt_heap_init(&heap);
@@ -55,7 +57,7 @@ static void kway_merge(void)
 
 	for (int i = 0; i < ARRAY_SIZE(r) - 4; i++) {
 		/* Get minimal */
-		tt_heap_gethead(&heap, &p);
+		tt_heap_extract(&heap, &p);
 		r[i] = p.sv;
 		/* Continue with current list */
 		int nexts = p.si;
@@ -77,7 +79,7 @@ static void kway_merge(void)
 
 	/* Last 4 data */
 	for (int i = ARRAY_SIZE(r) - 4; i < ARRAY_SIZE(r); i++) {
-		tt_heap_gethead(&heap, &p);
+		tt_heap_extract(&heap, &p);
 		r[i] = p.sv;
 	}
 
