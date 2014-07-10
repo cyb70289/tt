@@ -10,7 +10,7 @@
 
 #define LEN	(64 * 1024)
 
-bool verify(tt_float *data)
+bool verify(int *data)
 {
 	for (int i = 0; i < LEN - 1; i++)
 		if (data[i] > data[i + 1])
@@ -20,25 +20,25 @@ bool verify(tt_float *data)
 
 int main(void)
 {
-	tt_float *data = malloc(sizeof(tt_float) * LEN);
-	tt_float *data_save = malloc(sizeof(tt_float) * LEN);
+	int *data = malloc(sizeof(int) * LEN);
+	int *data_save = malloc(sizeof(int) * LEN);
 
-	printf("Generating %d floating numbers...\n", LEN);
+	printf("Generating %d integers...\n", LEN);
 	struct timeval tv;
 	for (int i = 0; i < LEN; i++) {
 		gettimeofday(&tv, NULL);
 		srand(tv.tv_usec);
 		data[i] = rand();
-		data[i] /= ((RAND_MAX + 1.f) / 2000.f);
-		data[i] -= 1000.f;
+		data[i] /= (RAND_MAX / LEN);
+		data[i] -= (LEN / 2);
 	}
-	memcpy(data_save, data, sizeof(tt_float) * LEN);
+	memcpy(data_save, data, sizeof(int) * LEN);
 	printf("Done\n\n");
 
 	struct tt_sort_input input = {
 		.num	= {
-			.size	= sizeof(tt_float),
-			.type	= TT_NUM_FLOAT,
+			.size	= sizeof(int),
+			.type	= TT_NUM_SIGNED,
 			.cmp	= NULL,
 			.swap	= NULL,
 		},
@@ -47,7 +47,7 @@ int main(void)
 		.alg	= TT_SORT_MERGE,
 	};
 
-	memcpy(data, data_save, sizeof(tt_float) * LEN);
+	memcpy(data, data_save, sizeof(int) * LEN);
 	printf("Testing merge sort...\n");
 	clock_t st = clock();
 	tt_sort(&input);
@@ -57,7 +57,7 @@ int main(void)
 		printf("FAIL\n");
 	printf("\n");
 
-	memcpy(data, data_save, sizeof(tt_float) * LEN);
+	memcpy(data, data_save, sizeof(int) * LEN);
 	printf("Testing heap sort...\n");
 	input.num.cmp = NULL;
 	input.num.swap = NULL;
@@ -70,7 +70,60 @@ int main(void)
 		printf("FAIL\n");
 	printf("\n");
 
-	memcpy(data, data_save, sizeof(tt_float) * LEN);
+	memcpy(data, data_save, sizeof(int) * LEN);
+	printf("Testing quick sort(random)...\n");
+	input.num.cmp = NULL;
+	input.num.swap = NULL;
+	input.alg = TT_SORT_QUICK;
+	st = clock();
+	tt_sort(&input);
+	if (verify(data))
+		printf("Done in %u ms\n", (uint)(clock() - st) / 1000);
+	else
+		printf("FAIL\n");
+	printf("\n");
+
+	printf("Testing quick sort(sorted)...\n");
+	input.num.cmp = NULL;
+	input.num.swap = NULL;
+	input.alg = TT_SORT_QUICK;
+	st = clock();
+	tt_sort(&input);
+	if (verify(data))
+		printf("Done in %u ms\n", (uint)(clock() - st) / 1000);
+	else
+		printf("FAIL\n");
+	printf("\n");
+
+	printf("Testing quick sort(two value)...\n");
+	for (int i = 0; i < LEN; i++)
+		data[i] = (data[i] >= 0 ? 1 : -1);
+	input.num.cmp = NULL;
+	input.num.swap = NULL;
+	input.alg = TT_SORT_QUICK;
+	st = clock();
+	tt_sort(&input);
+	if (verify(data))
+		printf("Done in %u ms\n", (uint)(clock() - st) / 1000);
+	else
+		printf("FAIL\n");
+	printf("\n");
+
+	printf("Testing quick sort(equal)...\n");
+	for (int i = 0; i < LEN; i++)
+		data[i] = 1;
+	input.num.cmp = NULL;
+	input.num.swap = NULL;
+	input.alg = TT_SORT_QUICK;
+	st = clock();
+	tt_sort(&input);
+	if (verify(data))
+		printf("Done in %u ms\n", (uint)(clock() - st) / 1000);
+	else
+		printf("FAIL\n");
+	printf("\n");
+
+	memcpy(data, data_save, sizeof(int) * LEN);
 	printf("Testing insert sort...\n");
 	input.num.cmp = NULL;
 	input.num.swap = NULL;

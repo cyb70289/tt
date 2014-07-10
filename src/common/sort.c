@@ -18,6 +18,11 @@
 struct tt_sort_stat {
 	uint	time;	/* Time cost */
 	uint	space;	/* Extra space */
+
+	/* Used only in quick sort */
+	uint	depth;
+	int	head;
+	int	tail;
 };
 
 /* Insert sort
@@ -124,8 +129,8 @@ static int tt_sort_merge(struct tt_sort_input *in, struct tt_sort_stat *stat)
 }
 
 /* Heap sort (non-recursive)
- * Time: O(n*logn)
- * Space: in-place
+ * - Time: O(n*logn)
+ * - Space: in-place
  */
 static int tt_sort_heap(struct tt_sort_input *in, struct tt_sort_stat *stat)
 {
@@ -158,12 +163,142 @@ static int tt_sort_heap(struct tt_sort_input *in, struct tt_sort_stat *stat)
 	return 0;
 }
 
+/* Quick sort
+ * - Time: average - O(n*logn), worst - O(n^2)
+ * - Space: O(logn) recursive stack
+ * - Based on "Engineering A Sort Function" by Bently & McIlroy. This code
+ *   performs stable upon random, sorted, and nearly equal lists.
+ */
+static int tt_sort_quick(struct tt_sort_input *in, struct tt_sort_stat *stat)
+{
+	stat->depth++;	/* Max stack depth */
+	if (stat->depth > stat->space)
+		stat->space = stat->depth;
+
+	/* Buffer to hold pivot value */
+	char pivot[in->num.size] __align(8);
+
+	int p = stat->head;
+	int r = stat->tail;
+	while (p < r) {
+		/* Select pivot */
+		void *vp = sort_ptr(in, p);
+		void *vr = sort_ptr(in, r);
+		/* Pick middle element as pivot if short array */
+		void *vq = sort_ptr(in, (p + r) / 2);
+		void *vm = vq;
+		if (r - p >= 15) {
+			/* Pick medium-3 as pivot if long array */
+			if (in->num.cmp(&in->num, vp, vq) < 0) {
+				vm = vp;
+				if (in->num.cmp(&in->num, vp, vr) < 0) {
+					vm = vr;
+					if (in->num.cmp(&in->num, vq, vr) < 0)
+						vm = vq;
+				}
+			} else {
+				vm = vq;
+				if (in->num.cmp(&in->num, vq, vr) < 0) {
+					vm = vr;
+					if (in->num.cmp(&in->num, vp, vr) < 0)
+						vm = vp;
+				}
+			}
+		}
+		/* Save pivot value */
+		in->num._set(&in->num, pivot, vm);
+
+		/* Split-end partition */
+		void *pa = vp, *pb = vp;
+		void *pc = vr, *pd = vr;
+		while (1) {
+			int r;
+			while (pb <= pc &&
+				(r = in->num.cmp(&in->num, pb, pivot)) <= 0) {
+				if (r == 0) {
+					in->num.swap(&in->num, pa, pb);
+					pa += in->num.size;
+					stat->time++;
+				}
+				pb += in->num.size;
+				stat->time++;
+			}
+			while (pc >= pb &&
+				(r = in->num.cmp(&in->num, pc, pivot)) >= 0) {
+				if (r == 0) {
+					in->num.swap(&in->num, pc, pd);
+					pd -= in->num.size;
+					stat->time++;
+				}
+				pc -= in->num.size;
+				stat->time++;
+			}
+			if (pb > pc)
+				break;
+			in->num.swap(&in->num, pb, pc);
+			pb += in->num.size;
+			pc -= in->num.size;
+			stat->time++;
+		}
+		/* Current layout
+		 *  +-----+---------+---------+-----+
+		 *  |  =  |    <    |    >    |  =  |
+		 *  +-----+---------+---------+-----+
+		 *  vp    pa      pc pb       pd   rp
+		 */
+
+		int l = tt_min(pa - vp, pb - pa);
+		void *vt = pb - l;
+		while (l) {
+			in->num.swap(&in->num, vp, vt);
+			vp += in->num.size;
+			vt += in->num.size;
+			l -= in->num.size;
+			stat->time++;
+		}
+		l = tt_min(pd - pc, vr - pd);
+		vt = pb;
+		vr -= (l - in->num.size);
+		while (l) {
+			in->num.swap(&in->num, vt, vr);
+			vt += in->num.size;
+			vr += in->num.size;
+			l -= in->num.size;
+			stat->time++;
+		}
+		int q1 = p + (pb - pa) / in->num.size - 1;
+		int q2 = r - (pd - pc) / in->num.size + 1;
+		/* Current layout
+		 *  +---------+---------+----------+
+		 *  |    <    |    =    |    >     |
+		 *  +---------+---------+----------+
+		 *  p        q1         q2         r
+		 */
+
+		/* Call upon short list recursively, leave long one iterated */
+		if (q1 - p <= r - q2) {
+			stat->head = p;
+			stat->tail = q1;
+			tt_sort_quick(in, stat);
+			p = q2;
+		} else {
+			stat->head = q2;
+			stat->tail = r;
+			tt_sort_quick(in, stat);
+			r = q1;
+		}
+	}
+
+	stat->depth--;
+	return 0;
+}
+
 static int (*tt_sort_internal[])(struct tt_sort_input *,
 		struct tt_sort_stat *stat) = {
 	[TT_SORT_INSERT]	= tt_sort_insert,
 	[TT_SORT_MERGE]		= tt_sort_merge,
 	[TT_SORT_HEAP]		= tt_sort_heap,
-/*	[TT_SORT_QUICK]		= tt_sort_quick,*/
+	[TT_SORT_QUICK]		= tt_sort_quick,
 };
 
 int tt_sort(struct tt_sort_input *input)
@@ -174,6 +309,7 @@ int tt_sort(struct tt_sort_input *input)
 
 	struct tt_sort_stat stat;
 	memset(&stat, 0, sizeof(struct tt_sort_stat));
+	stat.tail = input->count - 1;	/* Only for quick sort */
 	int ret = tt_sort_internal[input->alg](input, &stat);
 
 	tt_debug("time: %u, space: %u", stat.time, stat.space);
