@@ -28,6 +28,7 @@ struct tt_sort_stat {
 /* Insert sort
  * - Time: O(n^2)
  * - Space: in-place
+ * - Stable
  * - Insert sort beats O(n*logn) algorithms on small array
  */
 static int tt_sort_insert(struct tt_sort_input *in, struct tt_sort_stat *stat)
@@ -65,6 +66,7 @@ static int tt_sort_insert(struct tt_sort_input *in, struct tt_sort_stat *stat)
 /* Merge sort (non-recursive)
  * - Time: O(n*logn)
  * - Space: O(n)
+ * - Stable
  */
 static int tt_sort_merge(struct tt_sort_input *in, struct tt_sort_stat *stat)
 {
@@ -96,7 +98,7 @@ static int tt_sort_merge(struct tt_sort_input *in, struct tt_sort_stat *stat)
 						la = false;
 					} else {
 						la = in->num.cmp(&in->num,
-								ptr1, ptr2) < 0;
+							ptr1, ptr2) <= 0;
 						stat->time++;	/* Compare */
 					}
 				}
@@ -131,6 +133,7 @@ static int tt_sort_merge(struct tt_sort_input *in, struct tt_sort_stat *stat)
 /* Heap sort (non-recursive)
  * - Time: O(n*logn)
  * - Space: in-place
+ * - Unstable
  */
 static int tt_sort_heap(struct tt_sort_input *in, struct tt_sort_stat *stat)
 {
@@ -166,6 +169,7 @@ static int tt_sort_heap(struct tt_sort_input *in, struct tt_sort_stat *stat)
 /* Quick sort
  * - Time: average - O(n*logn), worst - O(n^2)
  * - Space: O(logn) recursive stack
+ * - Unstable
  * - Based on "Engineering A Sort Function" by Bently & McIlroy. This code
  *   performs stable upon random, sorted, and nearly equal lists.
  */
