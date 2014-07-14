@@ -20,3 +20,7 @@ $(eval $(call make-test,$(localdir),$(testname),$(objs-$(testname))))
 testname := heap
 objs-$(testname) := heap.o
 $(eval $(call make-test,$(localdir),$(testname),$(objs-$(testname))))
+
+testname := tree
+objs-$(testname) := tree.o
+$(eval $(call make-test,$(localdir),$(testname),$(objs-$(testname))))
