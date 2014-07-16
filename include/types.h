@@ -33,3 +33,9 @@ struct tt_num {
 	void	(*_set)(const struct tt_num *num,
 			void *dst, const void *src);	/* Set value */
 };
+
+/* Color */
+enum tt_color {
+	TT_COLOR_RED,
+	TT_COLOR_BLACK,
+};
