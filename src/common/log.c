@@ -4,7 +4,6 @@
  */
 #include <tt.h>
 #include <string.h>
-
 #include <_common.h>
 
 static char level2char[] = {

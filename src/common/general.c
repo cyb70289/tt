@@ -242,14 +242,14 @@ int _tt_num_select(struct tt_num *num)
 		num->swap = tt_swap_select(num->size);
 		if (!num->swap) {
 			tt_error("No default swap routine");
-			return -EPARAM;
+			return -TT_EPARAM;
 		}
 	}
 	if (!num->cmp) {
 		num->cmp = tt_cmp_select(num->size, num->type);
 		if (!num->cmp) {
 			tt_error("No default compare routine");
-			return -EPARAM;
+			return -TT_EPARAM;
 		}
 	}
 	num->_set = tt_set_select(num->size);

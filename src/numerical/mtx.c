@@ -3,7 +3,6 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt.h>
-
 #include <matrix.h>
 #include <_common.h>
 #include <_matrix.h>

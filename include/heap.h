@@ -50,7 +50,7 @@ int tt_heap_adjust(struct tt_heap *heap, int index, const void *v);
 static inline int tt_heap_insert(struct tt_heap *heap, const void *v)
 {
 	if (heap->__heaplen == heap->cap)
-		return -EOVERFLOW;
+		return -TT_EOVERFLOW;
 	heap->num._set(&heap->num, heap_ptr(heap, heap->__heaplen), v);
 	heap->__heaplen++;
 	heap->_adjust(heap, heap->__heaplen - 1);

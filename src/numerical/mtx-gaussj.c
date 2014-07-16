@@ -4,7 +4,6 @@
  */
 #include <tt.h>
 #include <math.h>
-
 #include <matrix.h>
 #include <_common.h>
 #include <_matrix.h>
@@ -30,7 +29,7 @@ int tt_mtx_gaussj(struct tt_mtx *ma, struct tt_mtx *mb)
 	/* Alloc memory at once in a larger buffer */
 	status_buf = calloc(3 * ma->rows, sizeof(int));
 	if (status_buf == NULL)
-		return -ENOMEM;
+		return -TT_ENOMEM;
 	row_processed = status_buf;
 	col_processed = row_processed + ma->rows;
 	switchto = col_processed + ma->rows;
@@ -54,7 +53,7 @@ int tt_mtx_gaussj(struct tt_mtx *ma, struct tt_mtx *mb)
 			}
 		}
 		if (_tt_is_zero(max)) {
-			ret = -ESINGULAR;	/* Singular matrix */
+			ret = -TT_ESINGULAR;	/* Singular matrix */
 			goto out;
 		}
 

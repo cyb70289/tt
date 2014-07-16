@@ -4,7 +4,6 @@
  */
 #include <tt.h>
 #include <string.h>
-
 #include <matrix.h>
 
 int main(void)
