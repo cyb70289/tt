@@ -1,7 +1,4 @@
-localdir := src/common
-locallib := libttcommon.a
+lib-y := libttcommon.a
 
-objs-y := log.o general.o sort.o
-objs-y += stack.o queue.o heap.o tree.o
-
-$(eval $(call make-lib,$(localdir),$(locallib),$(objs-y)))
+obj-y += log.o general.o
+obj-y += sort.o stack.o queue.o heap.o tree.o

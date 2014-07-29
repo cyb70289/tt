@@ -1,6 +1,3 @@
-localdir := src/numerical
-locallib := libttnum.a
+lib-y := libttnum.a
 
-objs-y := mtx.o mtx-gaussj.o
-
-$(eval $(call make-lib,$(localdir),$(locallib),$(objs-y)))
+obj-y += mtx.o mtx-gaussj.o

@@ -2,16 +2,23 @@
 #
 # Copyright (C) 2014 Yibo Cai
 
+#################################################
+# General definitions
+#################################################
 TOPDIR		:= $(CURDIR)
-
-# Set to 0 to turn off color message
-COLOR_MSG	:= 1
 
 # Show terse build message unless "make V=1"
 ifeq ("$(origin V)", "command line")
+  VERBOSE := $(V)
+else
+  VERBOSE := 0
+endif
+ifeq ($(VERBOSE),1)
   Q :=
+  quiet :=
 else
   Q := @
+  quiet := quiet_
 endif
 
 # Host
@@ -37,39 +44,27 @@ RMDIR		:= rm -rf
 MKDIR		:= mkdir -p
 MV		:= mv -f
 SED		:= sed
-ECHO		:= echo -e
+ECHO		:= echo
 
 # Extra files to clean
 CLEAN_FILES	:=
 DISTCLEAN_FILES	:= .config* defconfig
 
 # Compiler flags
-CPPFLAGS	:= -g -O2 -fno-strict-aliasing
+CPPFLAGS	+= -g -O2 -fno-strict-aliasing
 CPPFLAGS	+= -I$(TOPDIR)/include -I$(TOPDIR)/src/include
 CFLAGS		+= -Wall -Werror -Wstrict-prototypes -std=c99
-AFLAGS		+= $(CPPFLAGS)
-ARFLAGS		:= rcs
+AFLAGS		+= -I$(TOPDIR)/include -I$(TOPDIR)/src/include
 
-# Target specific
-CFLAGS_TARGET	:=
-LDFLAGS_TARGET	:=
-
-Kconfig		:= Kconfig
-
-# Construct in non recursive method
-OBJS		:=
-
-TTLIBS		:=
-TTTESTS		:=
+# Target specific flags
+CFLAGS		+= $(CFLAGS_TARGET)
+AFLAGS		+= $(AFLAGS_TARGET)
+LDFLAGS		+= $(LDFLAGS_TARGET)
 
 # Check if were are building image
 BUILD_IMAGE	:= 1
 ifneq "$(filter %help,$(MAKECMDGOALS))" ""
   # help
-  BUILD_IMAGE	:= 0
-endif
-ifneq "$(filter %install,$(MAKECMDGOALS))" ""
-  # install
   BUILD_IMAGE	:= 0
 endif
 ifneq "$(filter %clean,$(MAKECMDGOALS))" ""
@@ -81,39 +76,22 @@ ifneq "$(filter %config,$(MAKECMDGOALS))" ""
   BUILD_IMAGE	:= 0
 endif
 
-# Color message
-ifeq ("$(COLOR_MSG)", "0")
-  GREEN		:=
-  BLUE		:=
-  YELLOW	:=
-  COLOR_END	:=
-else
-  GREEN		:= "\033[32m"
-  BLUE		:= "\033[36m"
-  YELLOW	:= "\033[33m"
-  COLOR_END	:= "\033[0m"
-endif
+# Short building messages
+show_msg = $(if $($(quiet)msg_$1),$(ECHO) $($(quiet)msg_$1)$2)
+quiet_msg_cc	= "  CC      "
+quiet_msg_as	= "  AS      "
+quiet_msg_ar	= "  AR      "
+quiet_msg_ld	= "  LD      "
+quiet_msg_link	= "  LINK    "
+quiet_msg_clean	= "  CLEAN   "
 
-# $call(terse_cc,target)
-define terse_cc
-  [ "$(Q)" = "@" ] && $(ECHO) CC $1 | $(SED) 's/^-e //' || $(ECHO) > /dev/null
-endef
-
-# $call(terse_ar,target)
-define terse_ar
-  [ "$(Q)" = "@" ] && $(ECHO) $(GREEN)AR $1$(COLOR_END) | $(SED) 's/^-e //' \
-	  || $(ECHO) > /dev/null
-endef
-
-# $call(terse_ld,target)
-define terse_ld
-  [ "$(Q)" = "@" ] && $(ECHO) $(YELLOW)LD $1$(COLOR_END) | $(SED) 's/^-e //' \
-	  || $(ECHO) > /dev/null
-endef
-
+# Default target
 all:
 
+#################################################
 # Kconfig
+#################################################
+Kconfig		:= Kconfig
 include scripts/kconfig/config.mk
 ifeq "$(BUILD_IMAGE)" "1"
   -include include/config/auto.conf
@@ -127,49 +105,86 @@ include/config/%.conf: scripts/kconfig/conf .config include/config/auto.conf.cmd
 
 .config include/config/auto.conf.cmd:
 
-# Generate libraries
-# $(call make-lib,localdir,libname,object-files)
-define make-lib
-  tt_locallib := $1/$2
-  tt_localobjs := $(addprefix $1/,$3)
-  TTLIBS += $$(tt_locallib)
-  OBJS += $$(tt_localobjs)
+#################################################
+# Non-recursive build
+#################################################
+LIBS		:=
+BINS		:=
+DEPS		:=
 
-  $$(tt_locallib): $$(tt_localobjs)
-	$(Q)$(AR) $(ARFLAGS) $$@ $$^
-	@$(call terse_ar,$$@)
-endef
+# $(call to-dep-file,obj-file-list)
+# path/source.o -> path/.source.d
+to-dep-file = $(foreach f,$(subst .o,.d,$1),$(dir $(f)).$(notdir $(f)))
 
 # Generate test binaries
-# $(call make-test,localdir,testname,object-files)
-define make-test
-  tt_testname := $1/$2
-  tt_localobjs := $(addprefix $1/,$3)
-  TTTESTS += $$(tt_testname)
-  OBJS += $(filter-out $$(OBJS),$$(tt_localobjs))
+# $(call make-test-target,dir,target,objs)
+define make-test-target
+  BINS += $1/$2
+  $1/$2: $$(addprefix $1/,$3) $$(LIBS)
+	$(Q)$(CC) $$^ $$(LIBS) -o $$@
+	@$$(call show_msg,link,$$@)
+endef
 
-  $$(tt_testname): $$(tt_localobjs) $$(TTLIBS)
-	$(Q)$(CC) $(LDFLAGS_TARGET) $$^ $$(TTLIBS) -o $$@
-	@$(call terse_ld,$$@)
+# $(call make-test,dir)
+define make-test
+  bin-y :=
+
+  include $1/config.mk
+  bin-y := $$(strip $$(bin-y))
+
+  obj-y :=
+  $$(foreach b,$$(bin-y),$$(eval obj-y += $$(strip $$($$(b)-objs))))
+  DEPS += $$(call to-dep-file,$$(addprefix $1/,$$(sort $$(obj-y))))
+
+  $$(foreach b,$$(bin-y),$$(eval $$(call \
+				  make-test-target,$1,$$(b),$$($$(b)-objs))))
+endef
+
+# Parse config.mk recursively
+# $(call include-config,dir)
+define include-config
+  obj-y :=
+  dir-y :=
+  lib-y :=
+
+  include $1/config.mk
+  obj-y := $$(strip $$(obj-y))
+  dir-y := $$(strip $$(dir-y))
+  lib-y := $$(strip $$(lib-y))
+
+  DEPS += $$(call to-dep-file,$$(addprefix $1/,$$(obj-y)))
+  LIBS += $$(addprefix $1/,$$(lib-y))
+
+  ifneq "$$(obj-y)" ""
+    $$(addprefix $1/,$$(obj-y)): include/config/auto.conf
+  endif
+
+  $1/built-in.o: $$(addprefix $1/,$$(obj-y)) \
+		$$(addsuffix /built-in.o,$$(addprefix $1/,$$(dir-y)))
+	$(Q)$$(if $$^,$(LD) -r -o $$@ $$^,$(AR) rcs $$@)
+	@$$(call show_msg,ld,$$@)
+
+  ifneq "$$(lib-y)" ""
+    $1/$$(lib-y): $1/built-in.o
+	$(Q)$(AR) rcs $$@ $$^
+	@$$(call show_msg,ar,$$@)
+  endif
+
+  cdir := $(subst /,-,$1)
+  subdir-$$(cdir) := $$(addprefix $1/,$$(dir-y))
+  $$(foreach d,$$(subdir-$$(cdir)),$$(eval $$(call include-config,$$(d))))
 endef
 
 # Include all config.mk
-include src/config.mk
-include tests/config.mk
+$(eval $(call include-config,src))
+$(eval $(call make-test,tests))
 
+#################################################
 # Dependencies
-
-# $(call to-dep-file,suffix,file-list)
-# path/source.o -> path/.source.d
-define to-dep-file
-  $(foreach f,$(subst $1,.d,$2),$(dir $(f)).$(notdir $(f)))
-endef
-
-DEPS = $(call to-dep-file,.o,$(OBJS))
-
+#################################################
 # $(call make-depend,source-file,object-file,depend-file)
 define make-depend
-  $(CC) $(CFLAGS) $(CPPFLAGS) $(TARGET_ARCH) -M $1 |	\
+  $(CC) $(CFLAGS) $(CPPFLAGS) -M $1 |	\
 	$(SED) 's,\($(notdir $2)\) *:,$2 $3: ,' > $3.tmp
 	# Append empty rules
 	$(SED)  -e 's/#.*//'		\
@@ -182,33 +197,37 @@ define make-depend
 endef
 
 %.o: %.c
-	@$(call make-depend,$<,$@,$(call to-dep-file,.o,$@))
-	$(Q)$(COMPILE.c) $(CFLAGS_TARGET) -o $@ $<
-	@$(call terse_cc,$@)
+	@$(call make-depend,$<,$@,$(call to-dep-file,$@))
+	$(Q)$(COMPILE.c) -o $@ $<
+	@$(call show_msg,cc,$@)
 
 %.o: %.S
-	@$(call make-depend,$<,$@,$(call to-dep-file,.o,$@))
-	$(Q)$(COMPILE.S) $(CFLAGS_TARGET) -o $@ $<
-	@$(call terse_cc,$@)
+	@$(call make-depend,$<,$@,$(call to-dep-file,$@))
+	$(Q)$(COMPILE.S) -o $@ $<
+	@$(call show_msg,as,$@)
 
 ifeq "$(BUILD_IMAGE)" "1"
   -include $(DEPS)
 endif
 
-# Target
+#################################################
+# Targets
+#################################################
 .PHONY: all install clean distclean
 
-$(OBJS): include/config/auto.conf
-
-all: $(TTLIBS) $(TTTESTS)
+all: $(LIBS) $(BINS)
 
 install: all
 
 clean:
-	find src tests -name *.o -o -name .*.d | xargs $(RM)
-	$(RM) $(TTLIBS) $(TTTESTS)
+	$(Q)find src tests -name *.[oad] -o -name *.tmp | xargs $(RM)
+	$(Q)$(RM) $(LIBS) $(BINS)
+	@$(call show_msg,clean,src tests)
 
 distclean: clean
-	@find scripts/kconfig -name *.o | xargs $(RM)
-	$(RM) $(DISTCLEAN_FILES)
-	$(RMDIR) include/generated include/config
+	$(Q)find scripts/kconfig -name *.o | xargs $(RM)
+	@$(call show_msg,clean,scripts)
+	$(Q)$(RM) $(DISTCLEAN_FILES)
+	@$(call show_msg,clean,$(DISTCLEAN_FILES))
+	$(Q)$(RMDIR) include/generated include/config
+	@$(call show_msg,clean,include/generated include/config)

@@ -24,10 +24,10 @@ savedefconfig: $(LOCAL_DIR)/conf
 
 defconfig: $(LOCAL_DIR)/conf
 	@echo "*** Default configuration is based on 'deconfig'"
-	@$< --defconfig=configs/defconfig $(Kconfig)
+	@$< --defconfig=src/configs/defconfig $(Kconfig)
 
 %_defconfig: $(LOCAL_DIR)/conf
-	@$< --defconfig=configs/$@ $(Kconfig)
+	@$< --defconfig=src/configs/$@ $(Kconfig)
 
 .PHONY: help
 help:
@@ -63,13 +63,17 @@ dochecklxdialog:
 		$(HOSTCC) $(EXTRA_CFLAGS) $(EXTRA_LDLIBS)
 $(lxdialog): dochecklxdialog
 
+quiet_msg_hostcc = "  HOSTCC  "
+
 $(LOCAL_DIR)/mconf: $(mconfsrc) $(lxdialog)
-	$(HOSTCC) $(EXTRA_CFLAGS) -o $@ $^ $(EXTRA_LDLIBS)
-	$(HOST_STRIP) $@
+	$(Q)$(HOSTCC) $(EXTRA_CFLAGS) -o $@ $^ $(EXTRA_LDLIBS)
+	@$(call show_msg,hostcc,$@)
+	@$(HOST_STRIP) $@
 
 $(LOCAL_DIR)/conf: $(confsrc)
-	$(HOSTCC) $(HOST_CFLAGS) -o $@ $^ $(HOST_LDLIBS)
-	$(HOST_STRIP) $@
+	$(Q)$(HOSTCC) $(HOST_CFLAGS) -o $@ $^ $(HOST_LDLIBS)
+	@$(call show_msg,hostcc,$@)
+	@$(HOST_STRIP) $@
 
 # Files to clean
 DISTCLEAN_FILES += $(LOCAL_DIR)/conf

@@ -1,8 +1,3 @@
-localdir := src
-
-# General libs should be put last
-
-subdir-y := numerical
-subdir-y += common
-
-include $(patsubst %,$(localdir)/%/config.mk,$(subdir-y))
+# General libs should be put below
+dir-y += numerical
+dir-y += common
