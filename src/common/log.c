@@ -35,6 +35,7 @@ void tt_log_set_fd(int fd)
 	if (fd >= 0) {
 		__fd = fd;
 	} else if (__fd >= 0) {
+		tt_log_set_target(TT_LOG_TARGET_STDERR);
 		close(__fd);
 		__fd = -1;
 	}
@@ -45,8 +46,6 @@ void tt_log(int level, const char *func, const char *format, ...)
 	tt_assert(level >= 0 && level < TT_LOG_MAX);
 
 	if (__target == TT_LOG_TARGET_NULL)
-		return;
-	if (__target == TT_LOG_TARGET_FD && __fd < 0)
 		return;
 	if (level > __level)
 		return;
@@ -78,12 +77,11 @@ void tt_log(int level, const char *func, const char *format, ...)
 				write(__fd, msg, strlen(msg)) < 0) {
 			tt_log_set_fd(-1);
 			fprintf(stderr, "Error writing logs to file descriptor,"
-					" redirect messges to console\n.");
+					" redirect messges to console.\n");
 			tt_log_set_target(TT_LOG_TARGET_STDERR);
 		}
 		break;
 
-	case TT_LOG_TARGET_NULL:
 	default:
 		break;
 	}
