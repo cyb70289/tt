@@ -1,2 +1,4 @@
-tt_stack, tt_queue: only ensures 8-bytes alignment
-select, rank
+- float number overflow detection
+- simd optimization
+- tt_stack, tt_queue: only ensures 8-bytes alignment
+- select, rank

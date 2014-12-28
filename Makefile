@@ -56,6 +56,9 @@ CPPFLAGS	+= -I$(TOPDIR)/include -I$(TOPDIR)/src/include
 CFLAGS		+= -Wall -Werror -Wstrict-prototypes -std=c99
 AFLAGS		+= -I$(TOPDIR)/include -I$(TOPDIR)/src/include
 
+# Extra libraries
+LDLIBS		+= -lm
+
 # Target specific flags
 CFLAGS		+= $(CFLAGS_TARGET)
 AFLAGS		+= $(AFLAGS_TARGET)
@@ -121,7 +124,7 @@ to-dep-file = $(foreach f,$(subst .o,.d,$1),$(dir $(f)).$(notdir $(f)))
 define make-test-target
   BINS += $1/$2
   $1/$2: $$(addprefix $1/,$3) $$(LIBS)
-	$(Q)$(CC) $$^ $$(LIBS) -o $$@
+	$(Q)$(CC) $$^ $$(LIBS) $$(LDLIBS) -o $$@
 	@$$(call show_msg,link,$$@)
 endef
 
