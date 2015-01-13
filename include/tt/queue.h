@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <list.h>
+#include "list.h"
 
 struct tt_queue {
 	uint	cap;	/* Maxiam elements, 0 - dynamic */

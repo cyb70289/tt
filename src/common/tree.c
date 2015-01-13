@@ -2,10 +2,11 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
+#include <tt/tt.h>
+#include <tt/tree.h>
+#include "_common.h"
+
 #include <string.h>
-#include <tree.h>
-#include <_common.h>
 
 /* Red-Black tree operations */
 static inline struct tt_bintree_node *tt_rbtree_min(

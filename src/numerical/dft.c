@@ -2,10 +2,10 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
-#include <dsp.h>
-#include <complex.h>
-#include <_common.h>
+#include <tt/tt.h>
+#include <tt/dsp.h>
+#include <tt/complex.h>
+#include "../common/_common.h"
 
 #include <math.h>
 

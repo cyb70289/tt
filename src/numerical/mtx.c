@@ -2,10 +2,10 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
-#include <matrix.h>
-#include <_common.h>
-#include <_matrix.h>
+#include <tt/tt.h>
+#include <tt/matrix.h>
+#include "../common/_common.h"
+#include "../common/_matrix.h"
 
 /* Naive implementation of matrix multiplication
  * [mi1] * [mi2] = mo

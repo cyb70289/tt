@@ -2,9 +2,10 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
+#include <tt/tt.h>
+#include "_common.h"
+
 #include <string.h>
-#include <_common.h>
 
 /* Swap */
 static void tt_swap_8(const struct tt_num *num, void *v1, void *v2)

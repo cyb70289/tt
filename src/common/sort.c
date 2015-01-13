@@ -8,11 +8,12 @@
  * Don't blame me on performance loss of this messy code. I think I'm correct
  * in a big picture.
  */
-#include <tt.h>
+#include <tt/tt.h>
+#include <tt/sort.h>
+#include <tt/heap.h>
+#include "_common.h"
+
 #include <string.h>
-#include <sort.h>
-#include <heap.h>
-#include <_common.h>
 
 /* algorithm complexity statistics */
 struct tt_sort_stat {

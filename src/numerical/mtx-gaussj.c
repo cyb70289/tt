@@ -2,11 +2,12 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
+#include <tt/tt.h>
+#include <tt/matrix.h>
+#include "../common/_common.h"
+#include "../common/_matrix.h"
+
 #include <math.h>
-#include <matrix.h>
-#include <_common.h>
-#include <_matrix.h>
 
 /* Gauss-Jordan elimination
  * - Resolve linear equations: [ma].[x] = [mb]

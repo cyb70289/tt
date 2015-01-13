@@ -2,9 +2,9 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
-#include <stack.h>
-#include <queue.h>
+#include <tt/tt.h>
+#include <tt/stack.h>
+#include <tt/queue.h>
 
 #define LEN	16
 

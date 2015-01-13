@@ -2,9 +2,10 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
+#include <tt/tt.h>
+#include "_common.h"
+
 #include <string.h>
-#include <_common.h>
 
 static char level2char[] = {
 	[TT_LOG_ERROR]  = 'E',

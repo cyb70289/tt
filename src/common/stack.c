@@ -2,11 +2,12 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
-#include <list.h>
-#include <stack.h>
+#include <tt/tt.h>
+#include <tt/list.h>
+#include <tt/stack.h>
+#include "_common.h"
+
 #include <string.h>
-#include <_common.h>
 
 /* Static allocated stack: Empty, Incremental */
 static int tt_stack_push_array(struct tt_stack *stack, const void *e)

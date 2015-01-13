@@ -2,9 +2,10 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
+#include <tt/tt.h>
+#include <tt/matrix.h>
+
 #include <string.h>
-#include <matrix.h>
 
 int main(void)
 {

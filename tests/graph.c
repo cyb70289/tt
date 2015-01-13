@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
-#include <tree.h>
+#include <tt/tt.h>
+#include <tt/tree.h>
 
 enum {
 	WHITE,

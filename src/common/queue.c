@@ -2,11 +2,12 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
-#include <list.h>
-#include <queue.h>
+#include <tt/tt.h>
+#include <tt/list.h>
+#include <tt/queue.h>
+#include "_common.h"
+
 #include <string.h>
-#include <_common.h>
 
 /* Static allocated queue: Ring buffer */
 static int tt_queue_enque_array(struct tt_queue *queue, const void *e)

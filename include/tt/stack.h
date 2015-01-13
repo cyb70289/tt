@@ -6,7 +6,7 @@
  */
 #pragma once
 
-#include <list.h>
+#include "list.h"
 
 struct tt_stack {
 	uint	cap;	/* Max elements, 0 - dynamic */

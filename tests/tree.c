@@ -2,9 +2,10 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
+#include <tt/tt.h>
+#include <tt/tree.h>
+
 #include <string.h>
-#include <tree.h>
 
 #define NUM	1024
 

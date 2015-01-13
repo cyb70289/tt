@@ -2,11 +2,12 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
+#include <tt/tt.h>
+#include <tt/sort.h>
+
 #include <string.h>
 #include <time.h>
 #include <sys/time.h>
-#include <sort.h>
 
 #define LEN	(64 * 1024)
 

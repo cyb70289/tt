@@ -2,8 +2,8 @@
  *
  * Copyright (C) 2014 Yibo Cai
  */
-#include <tt.h>
-#include <dsp.h>
+#include <tt/tt.h>
+#include <tt/dsp.h>
 
 #include <math.h>
 
