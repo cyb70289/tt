@@ -53,7 +53,7 @@ DISTCLEAN_FILES	:= .config* defconfig
 # Compiler flags
 CPPFLAGS	+= -g -O2 -fno-strict-aliasing
 CPPFLAGS	+= -I$(TOPDIR)/include
-CFLAGS		+= -Wall -Werror -Wstrict-prototypes -std=c99
+CFLAGS		+= -Wall -Werror -Wstrict-prototypes -std=gnu99
 AFLAGS		+= -I$(TOPDIR)/include
 
 # Extra libraries

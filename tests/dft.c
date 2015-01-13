@@ -32,6 +32,11 @@ static void sample_rect(int ones, int N, tt_float(*s)[2])
 
 int main(void)
 {
+	float a = 123456789.0f;
+	float b = a/0.0f;
+//	float c = a * a * a * a * a * a;
+	printf("%f\n", b);
+
 	tt_float in[8][2] = {
 		{ 0.3535, 0 },
 		{ 0.3535, 0 },
