@@ -3,9 +3,9 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/matrix.h>
-#include "../common/_common.h"
-#include "../common/_matrix.h"
+#include <tt/num/matrix.h>
+#include "num.h"
+#include "mtx.h"
 
 /* Naive implementation of matrix multiplication
  * [mi1] * [mi2] = mo

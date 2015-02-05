@@ -3,9 +3,9 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/dsp.h>
-#include <tt/complex.h>
-#include "../common/_common.h"
+#include <tt/num/dsp.h>
+#include <tt/num/complex.h>
+#include "num.h"
 
 #include <math.h>
 

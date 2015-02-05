@@ -1,4 +1,4 @@
-/* matrix.h
+/* Matrix
  *
  * Copyright (C) 2014 Yibo Cai
  */
@@ -6,9 +6,9 @@
 
 /* Matrix */
 struct tt_mtx {
-	int		rows;
-	int		cols;
-	tt_float	*v;
+	int rows;
+	int cols;
+	tt_float *v;
 };
 
 /* Matrix multiplication

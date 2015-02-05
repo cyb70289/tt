@@ -9,14 +9,14 @@
 
 #define NUM	1024
 
-int keycmp(const struct tt_num *num, const void *v1, const void *v2)
+static int keycmp(const struct tt_key *num, const void *v1, const void *v2)
 {
 	int diff = strlen((const char *)v1) - strlen((const char *)v2);
 	return diff ? diff : strcmp((const char *)v1, (const char *)v2);
 }
 
 /* a - z, aa - az, ba - bz, ... */
-char *v2key(int n)
+static char *v2key(int n)
 {
 	int i = 0;
 	char tmp[10];
@@ -36,7 +36,7 @@ char *v2key(int n)
 	return s;
 }
 
-int key2v(const char *key)
+static int key2v(const char *key)
 {
 	int n = 0;
 	while (*key) {
@@ -61,7 +61,7 @@ static bool walk(const void *key, const void *v, void *context)
 	return true;	/* Continue */
 }
 
-int tree_height(const struct tt_bintree_node *node)
+static int tree_height(const struct tt_bintree_node *node)
 {
 	if (!node)
 		return 0;
@@ -75,7 +75,6 @@ int main(void)
 
 	struct tt_bintree bt = {
 		.knum	= {
-			.type	= TT_NUM_USER,
 			.size	= 0,	/* Not used */
 			.cmp	= keycmp,
 			.swap	= NULL,	/* Not used */

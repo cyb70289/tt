@@ -10,7 +10,7 @@ struct pair {
 	int	sv;	/* value */
 };
 
-static int kway_cmp(const struct tt_num *num, const void *v1, const void *v2)
+static int kway_cmp(const struct tt_key *num, const void *v1, const void *v2)
 {
 	return ((const struct pair *)v1)->sv - ((const struct pair *)v2)->sv;
 }
@@ -34,7 +34,6 @@ static void kway_merge(void)
 	struct tt_heap heap = {
 		.num	= {
 			.size	= sizeof(struct pair),
-			.type	= TT_NUM_USER,
 			.cmp	= kway_cmp,
 			.swap	= NULL,
 		},

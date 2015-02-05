@@ -9,20 +9,20 @@
 #include "list.h"
 
 struct tt_queue {
-	uint	cap;	/* Maxiam elements, 0 - dynamic */
-	uint	size;	/* Byte size of each element */
+	uint cap;	/* Maxiam elements, 0 - dynamic */
+	uint esize;	/* Byte size of each element */
 
-	uint	_count;	/* Elements count */
+	uint _count;	/* Elements count */
 	union {
 		struct {
-			void	*_data;		/* Fixed array */
-			void	*_qhead;	/* Queue head */
-			void	*_qtail;	/* Queue tail */
+			void *_data;	/* Fixed array */
+			void *_qhead;	/* Queue head */
+			void *_qtail;	/* Queue tail */
 		};
-		struct tt_list	_head;		/* Dynamic list */
+		struct tt_list _head;	/* Dynamic list */
 	};
-	int	(*_enque)(struct tt_queue *queue, const void *e);
-	int	(*_deque)(struct tt_queue *queue, void *e);
+	int (*_enque)(struct tt_queue *queue, const void *e);
+	int (*_deque)(struct tt_queue *queue, void *e);
 };
 
 int tt_queue_init(struct tt_queue *queue);

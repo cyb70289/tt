@@ -3,7 +3,6 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include "_common.h"
 
 #include <string.h>
 

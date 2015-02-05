@@ -15,11 +15,11 @@ enum tt_sort_alg {
 
 /* Data array to be sorted */
 struct tt_sort_input {
-	struct tt_num		num;
+	struct tt_key num;
 
-	void	*data;	/* Element buffer */
-	uint	count;	/* Element count */
-	enum tt_sort_alg	alg;		/* Sorting algorithm */
+	void *data;		/* Element buffer */
+	uint count;		/* Element count */
+	enum tt_sort_alg alg;	/* Sorting algorithm */
 };
 
 /* Get address of i-th element */

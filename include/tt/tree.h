@@ -4,6 +4,11 @@
  */
 #pragma once
 
+enum tt_bintree_color {
+	TT_BINTREE_RED,
+	TT_BINTREE_BLACK,
+};
+
 /* Binary tree */
 struct tt_bintree;
 
@@ -13,37 +18,35 @@ struct tt_bintree_ops {
 	struct tt_bintree_node* (*max)(struct tt_bintree_node *node);
 	struct tt_bintree_node* (*search)(const struct tt_bintree *tree,
 					const void *key);
-	int	(*insert)(struct tt_bintree *tree, const void *key,
-			const void *v);
-	int	(*delete)(struct tt_bintree *tree,
-			struct tt_bintree_node *node);
-	int	(*walk)(const struct tt_bintree_node *node, void *context,
+	int (*insert)(struct tt_bintree *tree, const void *key, const void *v);
+	int (*delete)(struct tt_bintree *tree, struct tt_bintree_node *node);
+	int (*walk)(const struct tt_bintree_node *node, void *context,
 			bool (*walk)(const void *key, const void *v,
 				void *context));
 };
 
 /* Extended information of a tree node */
 union tt_bintree_ext {
-	enum tt_color	color;
+	enum tt_bintree_color color;
 };
 
 /* Binary tree */
 struct tt_bintree {
-	struct tt_num		knum;	/* data type of "key" */
-	struct tt_bintree_ops	*ops;
+	struct tt_key knum;	/* data type of "key" */
+	struct tt_bintree_ops *ops;
 
-	struct tt_bintree_node	*_root;
-	uint	_count;	/* Node count */
+	struct tt_bintree_node *_root;
+	uint _count;		/* Node count */
 };
 
 /* Tree node */
 struct tt_bintree_node {
-	void	*key;
-	void	*data;
-	struct tt_bintree_node	*parent;
-	struct tt_bintree_node	*left;
-	struct tt_bintree_node	*right;
-	union tt_bintree_ext	ext;
+	void *key;
+	void *data;
+	struct tt_bintree_node *parent;
+	struct tt_bintree_node *left;
+	struct tt_bintree_node *right;
+	union tt_bintree_ext ext;
 };
 
 void tt_bintree_init(struct tt_bintree *tree);

@@ -1,17 +1,11 @@
 /* General sorting algorithms
  *
  * Copyright (C) 2014 Yibo Cai
- *
- * General programming is hard, especially for C. I struggled much and finally
- * rejected C++ template because it still couldn't meet all conditions, and I
- * really dislike C++.
- * Don't blame me on performance loss of this messy code. I think I'm correct
- * in a big picture.
  */
 #include <tt/tt.h>
 #include <tt/sort.h>
 #include <tt/heap.h>
-#include "_common.h"
+#include "common.h"
 
 #include <string.h>
 
@@ -310,7 +304,7 @@ int tt_sort(struct tt_sort_input *input)
 {
 	tt_assert(input->alg >= 0 && input->alg < TT_SORT_MAX);
 
-	_tt_num_select(&input->num);
+	_tt_key_select(&input->num);
 
 	struct tt_sort_stat stat;
 	memset(&stat, 0, sizeof(struct tt_sort_stat));

@@ -5,7 +5,6 @@
 #include <tt/tt.h>
 #include <tt/list.h>
 #include <tt/queue.h>
-#include "_common.h"
 
 #include <string.h>
 
@@ -16,10 +15,10 @@ static int tt_queue_enque_array(struct tt_queue *queue, const void *e)
 		tt_debug("Overflow");
 		return -TT_EOVERFLOW;
 	}
-	memcpy(queue->_qtail, e, queue->size);
-	queue->_qtail += queue->size;
+	memcpy(queue->_qtail, e, queue->esize);
+	queue->_qtail += queue->esize;
 	/* Wrap to head */
-	if (queue->_qtail >= queue->_data + queue->cap * queue->size)
+	if (queue->_qtail >= queue->_data + queue->cap * queue->esize)
 		queue->_qtail = queue->_data;
 
 	queue->_count++;
@@ -32,10 +31,10 @@ static int tt_queue_deque_array(struct tt_queue *queue, void *e)
 		tt_debug("Underflow");
 		return -TT_EUNDERFLOW;
 	}
-	memcpy(e, queue->_qhead, queue->size);
-	queue->_qhead += queue->size;
+	memcpy(e, queue->_qhead, queue->esize);
+	queue->_qhead += queue->esize;
 	/* Wrap to head */
-	if (queue->_qhead >= queue->_data + queue->cap * queue->size)
+	if (queue->_qhead >= queue->_data + queue->cap * queue->esize)
 		queue->_qhead = queue->_data;
 
 	queue->_count--;
@@ -45,10 +44,10 @@ static int tt_queue_deque_array(struct tt_queue *queue, void *e)
 /* Dynamic linked queue */
 static int tt_queue_enque_list(struct tt_queue *queue, const void *e)
 {
-	void *qe = malloc(sizeof(struct tt_list) + queue->size);
+	void *qe = malloc(sizeof(struct tt_list) + queue->esize);
 	if (!qe)
 		return -TT_EOVERFLOW;
-	memcpy(qe + sizeof(struct tt_list), e, queue->size);
+	memcpy(qe + sizeof(struct tt_list), e, queue->esize);
 	tt_list_add(qe, &queue->_head);
 
 	queue->_count++;
@@ -62,7 +61,7 @@ static int tt_queue_deque_list(struct tt_queue *queue, void *e)
 		return -TT_EUNDERFLOW;
 	}
 	void *qe = queue->_head.next;
-	memcpy(e, qe + sizeof(struct tt_list), queue->size);
+	memcpy(e, qe + sizeof(struct tt_list), queue->esize);
 	tt_list_del(qe);
 	free(qe);
 
@@ -74,7 +73,7 @@ int tt_queue_init(struct tt_queue *queue)
 {
 	if (queue->cap) {
 		/* Allocate fixed array */
-		queue->_data = malloc(queue->size * queue->cap);
+		queue->_data = malloc(queue->esize * queue->cap);
 		if (!queue->_data)
 			return -TT_ENOMEM;
 		queue->_qhead = queue->_qtail = queue->_data;

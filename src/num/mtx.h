@@ -1,4 +1,4 @@
-/* _matrix.h
+/* matrix helper routines
  *
  * Copyright (C) 2014 Yibo Cai
  */

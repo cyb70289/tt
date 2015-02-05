@@ -47,7 +47,7 @@ int main(void)
 {
 	struct tt_stack stack = {
 		.cap	= LEN,
-		.size	= sizeof(int),
+		.esize	= sizeof(int),
 	};
 
 	printf("Testing static stack...\n");
@@ -65,7 +65,7 @@ int main(void)
 
 	struct tt_queue queue = {
 		.cap	= LEN,
-		.size	= sizeof(int),
+		.esize	= sizeof(int),
 	};
 
 	printf("Testing static queue...\n");

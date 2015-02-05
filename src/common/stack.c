@@ -5,7 +5,6 @@
 #include <tt/tt.h>
 #include <tt/list.h>
 #include <tt/stack.h>
-#include "_common.h"
 
 #include <string.h>
 
@@ -16,8 +15,8 @@ static int tt_stack_push_array(struct tt_stack *stack, const void *e)
 		tt_debug("Overflow");
 		return -TT_EOVERFLOW;
 	}
-	memcpy(stack->_top, e, stack->size);
-	stack->_top += stack->size;
+	memcpy(stack->_top, e, stack->esize);
+	stack->_top += stack->esize;
 
 	stack->_count++;
 	return 0;
@@ -29,8 +28,8 @@ static int tt_stack_pop_array(struct tt_stack *stack, void *e)
 		tt_debug("Underflow");
 		return -TT_EUNDERFLOW;
 	}
-	stack->_top -= stack->size;
-	memcpy(e, stack->_top, stack->size);
+	stack->_top -= stack->esize;
+	memcpy(e, stack->_top, stack->esize);
 
 	stack->_count--;
 	return 0;
@@ -39,10 +38,10 @@ static int tt_stack_pop_array(struct tt_stack *stack, void *e)
 /* Dynamic linked stack */
 static int tt_stack_push_list(struct tt_stack *stack, const void *e)
 {
-	void *se = malloc(sizeof(struct tt_list) + stack->size);
+	void *se = malloc(sizeof(struct tt_list) + stack->esize);
 	if (!se)
 		return -TT_EOVERFLOW;
-	memcpy(se + sizeof(struct tt_list), e, stack->size);
+	memcpy(se + sizeof(struct tt_list), e, stack->esize);
 	tt_list_add(se, &stack->_head);
 
 	stack->_count++;
@@ -56,7 +55,7 @@ static int tt_stack_pop_list(struct tt_stack *stack, void *e)
 		return -TT_EUNDERFLOW;
 	}
 	void *top = stack->_head.prev;
-	memcpy(e, top + sizeof(struct tt_list), stack->size);
+	memcpy(e, top + sizeof(struct tt_list), stack->esize);
 	tt_list_del(top);
 	free(top);
 
@@ -68,7 +67,7 @@ int tt_stack_init(struct tt_stack *stack)
 {
 	if (stack->cap) {
 		/* Allocate fixed array */
-		stack->_data = malloc(stack->size * stack->cap);
+		stack->_data = malloc(stack->esize * stack->cap);
 		if (!stack->_data)
 			return -TT_ENOMEM;
 		stack->_top = stack->_data;

@@ -10,15 +10,15 @@ enum tt_heap_type {
 };
 
 struct tt_heap {
-	struct tt_num		num;	/* Base number object */
+	struct tt_key num;	/* Base number object */
 
-	void	*data;	/* Data array */
-	uint	cap;	/* Capacity (max element count) */
-	enum tt_heap_type	htype;	/* Max or Min */
+	void *data;		/* Data array */
+	uint cap;		/* Capacity (max element count) */
+	enum tt_heap_type htype;/* Max or Min */
 
-	uint	__heaplen;	/* Heapified subarray length */
-	void	(*_heapify)(struct tt_heap *heap, int index);
-	void	(*_adjust)(struct tt_heap *heap, int index);
+	uint __heaplen;		/* Heapified subarray length */
+	void (*_heapify)(struct tt_heap *heap, int index);
+	void (*_adjust)(struct tt_heap *heap, int index);
 };
 
 /* Get address of i-th element */

@@ -1,21 +1,10 @@
-/* Common libs
+/* Common numerical libs
  *
  * Copyright (C) 2014 Yibo Cai
  */
 #pragma once
 
-#include "_types.h"
-
-/* Swap, may suffer side effects */
-#define __tt_swap(a, b)				\
-	do {					\
-		__typeof__(a) xyz_t = (a);	\
-		(a) = (b);			\
-		(b) = xyz_t;			\
-	} while (0)
-
-/* Select numeric handlers (compare, swap, set) */
-int _tt_num_select(struct tt_num *num);
+#include "../common/common.h"
 
 /* TODO: needs check */
 static inline bool _tt_is_zero(tt_float v)

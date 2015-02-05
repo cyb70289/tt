@@ -9,19 +9,19 @@
 #include "list.h"
 
 struct tt_stack {
-	uint	cap;	/* Max elements, 0 - dynamic */
-	uint	size;	/* Bytes of each element */
+	uint cap;	/* Max elements, 0 - dynamic */
+	uint esize;	/* Bytes of each element */
 
-	uint	_count;	/* Elements count */
+	uint _count;	/* Elements count */
 	union {
 		struct {
-			void	*_data;	/* Fixed array */
-			void	*_top;	/* Stack top pointer */
+			void *_data;	/* Fixed array */
+			void *_top;	/* Stack top pointer */
 		};
-		struct tt_list	_head;	/* Dynamic list */
+		struct tt_list _head;	/* Dynamic list */
 	};
-	int	(*_push)(struct tt_stack *stack, const void *e);
-	int	(*_pop)(struct tt_stack *stack, void *e);
+	int (*_push)(struct tt_stack *stack, const void *e);
+	int (*_pop)(struct tt_stack *stack, void *e);
 };
 
 int tt_stack_init(struct tt_stack *stack);

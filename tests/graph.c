@@ -11,7 +11,7 @@ enum {
 	BLACK,
 };
 
-int visit_count = 0;
+static int visit_count = 0;
 
 static void dfs_visit(const char *graph[], int n, int ft[], int color[], int i)
 {

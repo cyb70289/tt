@@ -1,3 +1,3 @@
 # General libs should be put below
-dir-y += numerical
+dir-y += num
 dir-y += common

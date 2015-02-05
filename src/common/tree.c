@@ -4,7 +4,7 @@
  */
 #include <tt/tt.h>
 #include <tt/tree.h>
-#include "_common.h"
+#include "common.h"
 
 #include <string.h>
 
@@ -95,7 +95,7 @@ static int tt_rbtree_insert(struct tt_bintree *tree, const void *key,
 		return -TT_ENOMEM;
 	z->key = (void *)key;
 	z->data = (void *)v;
-	z->ext.color = TT_COLOR_RED;
+	z->ext.color = TT_BINTREE_RED;
 
 	/* Insert as normal binary search tree */
 	struct tt_bintree_node *y = NULL, *x = tree->_root;
@@ -115,40 +115,40 @@ static int tt_rbtree_insert(struct tt_bintree *tree, const void *key,
 		y->right = z;
 
 	/* Rotate to maintain red-black property */
-	while (z->parent && z->parent->ext.color == TT_COLOR_RED) {
+	while (z->parent && z->parent->ext.color == TT_BINTREE_RED) {
 		if (z->parent == z->parent->parent->left) {
 			y = z->parent->parent->right;
-			if (y && y->ext.color == TT_COLOR_RED) {
-				z->parent->ext.color = TT_COLOR_BLACK;
-				y->ext.color = TT_COLOR_BLACK;
-				z->parent->parent->ext.color = TT_COLOR_RED;
+			if (y && y->ext.color == TT_BINTREE_RED) {
+				z->parent->ext.color = TT_BINTREE_BLACK;
+				y->ext.color = TT_BINTREE_BLACK;
+				z->parent->parent->ext.color = TT_BINTREE_RED;
 				z = z->parent->parent;
 			} else if (z == z->parent->right) {
 				z = z->parent;
 				tt_rbtree_rotate_left(tree, z);
 			} else {
-				z->parent->ext.color = TT_COLOR_BLACK;
-				z->parent->parent->ext.color = TT_COLOR_RED;
+				z->parent->ext.color = TT_BINTREE_BLACK;
+				z->parent->parent->ext.color = TT_BINTREE_RED;
 				tt_rbtree_rotate_right(tree, z->parent->parent);
 			}
 		} else {
 			y = z->parent->parent->left;
-			if (y && y->ext.color == TT_COLOR_RED) {
-				z->parent->ext.color = TT_COLOR_BLACK;
-				y->ext.color = TT_COLOR_BLACK;
-				z->parent->parent->ext.color = TT_COLOR_RED;
+			if (y && y->ext.color == TT_BINTREE_RED) {
+				z->parent->ext.color = TT_BINTREE_BLACK;
+				y->ext.color = TT_BINTREE_BLACK;
+				z->parent->parent->ext.color = TT_BINTREE_RED;
 				z = z->parent->parent;
 			} else if (z == z->parent->left) {
 				z = z->parent;
 				tt_rbtree_rotate_right(tree, z);
 			} else {
-				z->parent->ext.color = TT_COLOR_BLACK;
-				z->parent->parent->ext.color = TT_COLOR_RED;
+				z->parent->ext.color = TT_BINTREE_BLACK;
+				z->parent->parent->ext.color = TT_BINTREE_RED;
 				tt_rbtree_rotate_left(tree, z->parent->parent);
 			}
 		}
 	}
-	tree->_root->ext.color = TT_COLOR_BLACK;
+	tree->_root->ext.color = TT_BINTREE_BLACK;
 
 	tree->_count++;
 	return 0;
@@ -171,7 +171,7 @@ static void tt_rbtree_trans(struct tt_bintree *tree,
 static int tt_rbtree_delete(struct tt_bintree *tree, struct tt_bintree_node *z)
 {
 	struct tt_bintree_node *w, *x, *y = z;
-	enum tt_color ycolor = y->ext.color;
+	enum tt_bintree_color ycolor = y->ext.color;
 
 	/* Delete node */
 	if (!z->left) {
@@ -199,69 +199,69 @@ static int tt_rbtree_delete(struct tt_bintree *tree, struct tt_bintree_node *z)
 	}
 	free(z);
 
-	if (ycolor != TT_COLOR_BLACK)
+	if (ycolor != TT_BINTREE_BLACK)
 		return 0;
 
 	/* Rotate to maintain red-black property */
-	while (x && x != tree->_root && x->ext.color == TT_COLOR_BLACK) {
+	while (x && x != tree->_root && x->ext.color == TT_BINTREE_BLACK) {
 		if (x == x->parent->left) {
 			w = x->parent->right;
-			if (w->ext.color == TT_COLOR_RED) {
-				w->ext.color = TT_COLOR_BLACK;
-				x->parent->ext.color = TT_COLOR_RED;
+			if (w->ext.color == TT_BINTREE_RED) {
+				w->ext.color = TT_BINTREE_BLACK;
+				x->parent->ext.color = TT_BINTREE_RED;
 				tt_rbtree_rotate_left(tree, x->parent);
 				w = x->parent->right;
 			}
 			bool l = !w->left ||
-				w->left->ext.color == TT_COLOR_BLACK;
+				w->left->ext.color == TT_BINTREE_BLACK;
 			bool r = !w->right ||
-				w->right->ext.color == TT_COLOR_BLACK;
+				w->right->ext.color == TT_BINTREE_BLACK;
 			if (l && r) {
-				w->ext.color = TT_COLOR_RED;
+				w->ext.color = TT_BINTREE_RED;
 				x = x->parent;
 			} else if (r) {
-				w->left->ext.color = TT_COLOR_BLACK;
-				w->ext.color = TT_COLOR_RED;
+				w->left->ext.color = TT_BINTREE_BLACK;
+				w->ext.color = TT_BINTREE_RED;
 				tt_rbtree_rotate_right(tree, w);
 				w = x->parent->right;
 			} else {
 				w->ext.color = x->parent->ext.color;
-				x->parent->ext.color = TT_COLOR_BLACK;
-				w->right->ext.color = TT_COLOR_BLACK;
+				x->parent->ext.color = TT_BINTREE_BLACK;
+				w->right->ext.color = TT_BINTREE_BLACK;
 				tt_rbtree_rotate_left(tree, x->parent);
 				x = tree->_root;
 			}
 		} else {
 			w = x->parent->left;
-			if (w->ext.color == TT_COLOR_RED) {
-				w->ext.color = TT_COLOR_BLACK;
-				x->parent->ext.color = TT_COLOR_RED;
+			if (w->ext.color == TT_BINTREE_RED) {
+				w->ext.color = TT_BINTREE_BLACK;
+				x->parent->ext.color = TT_BINTREE_RED;
 				tt_rbtree_rotate_right(tree, x->parent);
 				w = x->parent->left;
 			}
 			bool r = !w->right ||
-				w->right->ext.color == TT_COLOR_BLACK;
+				w->right->ext.color == TT_BINTREE_BLACK;
 			bool l = !w->left ||
-				w->left->ext.color == TT_COLOR_BLACK;
+				w->left->ext.color == TT_BINTREE_BLACK;
 			if (r && l) {
-				w->ext.color = TT_COLOR_RED;
+				w->ext.color = TT_BINTREE_RED;
 				x = x->parent;
 			} else if (l) {
-				w->right->ext.color = TT_COLOR_BLACK;
-				w->ext.color = TT_COLOR_RED;
+				w->right->ext.color = TT_BINTREE_BLACK;
+				w->ext.color = TT_BINTREE_RED;
 				tt_rbtree_rotate_left(tree, w);
 				w = x->parent->left;
 			} else {
 				w->ext.color = x->parent->ext.color;
-				x->parent->ext.color = TT_COLOR_BLACK;
-				w->left->ext.color = TT_COLOR_BLACK;
+				x->parent->ext.color = TT_BINTREE_BLACK;
+				w->left->ext.color = TT_BINTREE_BLACK;
 				tt_rbtree_rotate_right(tree, x->parent);
 				x = tree->_root;
 			}
 		}
 	}
 	if (x)
-		x->ext.color = TT_COLOR_BLACK;
+		x->ext.color = TT_BINTREE_BLACK;
 
 	return 0;
 }
@@ -290,8 +290,8 @@ static struct tt_bintree_ops tt_rbtree_ops = {
 	.walk	= tt_rbtree_walk_in,
 };
 
-/* A dummy swap routine to satisfy _tt_num_select() */
-static void tt_bintree_swap_dummy(const struct tt_num *num, void *v1, void *v2)
+/* A dummy swap routine to satisfy _tt_key_select() */
+static void tt_bintree_swap_dummy(const struct tt_key *num, void *v1, void *v2)
 {
 	tt_info("No swap routine");
 }
@@ -307,7 +307,7 @@ void tt_bintree_init(struct tt_bintree *tree)
 
 	if (!tree->knum.swap)
 		tree->knum.swap = tt_bintree_swap_dummy;
-	_tt_num_select(&tree->knum);
+	_tt_key_select(&tree->knum);
 
 	tree->_root = NULL;
 	tree->_count = 0;

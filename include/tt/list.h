@@ -1,5 +1,4 @@
 /* Circular double linked list
- * Based on Linux source
  *
  * Copyright(C) 2014 Yibo Cai
  */

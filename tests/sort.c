@@ -11,7 +11,12 @@
 
 #define LEN	(64 * 1024)
 
-bool verify(int *data)
+static int cmp_int(const struct tt_key *num, const void *v1, const void *v2)
+{
+	return *(int *)v1 - *(int *)v2;
+}
+
+static bool verify(int *data)
 {
 	for (int i = 0; i < LEN - 1; i++)
 		if (data[i] > data[i + 1])
@@ -39,8 +44,7 @@ int main(void)
 	struct tt_sort_input input = {
 		.num	= {
 			.size	= sizeof(int),
-			.type	= TT_NUM_SIGNED,
-			.cmp	= NULL,
+			.cmp	= cmp_int,
 			.swap	= NULL,
 		},
 		.data	= data,
@@ -60,8 +64,6 @@ int main(void)
 
 	memcpy(data, data_save, sizeof(int) * LEN);
 	printf("Testing heap sort...\n");
-	input.num.cmp = NULL;
-	input.num.swap = NULL;
 	input.alg = TT_SORT_HEAP;
 	st = clock();
 	tt_sort(&input);
@@ -73,8 +75,6 @@ int main(void)
 
 	memcpy(data, data_save, sizeof(int) * LEN);
 	printf("Testing quick sort(random)...\n");
-	input.num.cmp = NULL;
-	input.num.swap = NULL;
 	input.alg = TT_SORT_QUICK;
 	st = clock();
 	tt_sort(&input);
@@ -85,8 +85,6 @@ int main(void)
 	printf("\n");
 
 	printf("Testing quick sort(sorted)...\n");
-	input.num.cmp = NULL;
-	input.num.swap = NULL;
 	input.alg = TT_SORT_QUICK;
 	st = clock();
 	tt_sort(&input);
@@ -99,8 +97,6 @@ int main(void)
 	printf("Testing quick sort(two value)...\n");
 	for (int i = 0; i < LEN; i++)
 		data[i] = (data[i] >= 0 ? 1 : -1);
-	input.num.cmp = NULL;
-	input.num.swap = NULL;
 	input.alg = TT_SORT_QUICK;
 	st = clock();
 	tt_sort(&input);
@@ -113,8 +109,6 @@ int main(void)
 	printf("Testing quick sort(equal)...\n");
 	for (int i = 0; i < LEN; i++)
 		data[i] = 1;
-	input.num.cmp = NULL;
-	input.num.swap = NULL;
 	input.alg = TT_SORT_QUICK;
 	st = clock();
 	tt_sort(&input);
@@ -126,8 +120,6 @@ int main(void)
 
 	memcpy(data, data_save, sizeof(int) * LEN);
 	printf("Testing insert sort...\n");
-	input.num.cmp = NULL;
-	input.num.swap = NULL;
 	input.alg = TT_SORT_INSERT;
 	st = clock();
 	tt_sort(&input);

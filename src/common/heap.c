@@ -4,7 +4,7 @@
  */
 #include <tt/tt.h>
 #include <tt/heap.h>
-#include "_common.h"
+#include "common.h"
 
 /* Heap with N elements
  * - Leaf elements: [N/2] ~ [N-1]
@@ -13,7 +13,7 @@
  */
 
 /* Reverse compare */
-static int tt_heap_rcmp(const struct tt_num *num,
+static int tt_heap_rcmp(const struct tt_key *num,
 		const void *v1, const void *v2)
 {
 	return -num->cmp(num, v1, v2);
@@ -22,7 +22,7 @@ static int tt_heap_rcmp(const struct tt_num *num,
 /* Heapify [index], taken [2*index+1] and [2*index+2] already heapified */
 static inline void tt_heap_heapify_internal(
 		struct tt_heap *heap, int index,
-		int (*cmp)(const struct tt_num *, const void *, const void*))
+		int (*cmp)(const struct tt_key *, const void *, const void*))
 {
 	while (index < heap->__heaplen / 2) {
 		/* Compare and swap with [2*index+1], [2*index+2] */
@@ -59,7 +59,7 @@ static void tt_heap_heapify_max(struct tt_heap *heap, int index)
 /* Rearrange element[index] to maintain heap property */
 static inline void tt_heap_adjust_internal(
 		struct tt_heap *heap, int index,
-		int (*cmp)(const struct tt_num *, const void *, const void*))
+		int (*cmp)(const struct tt_key *, const void *, const void*))
 {
 	/* Buffer for one element */
 	char tmp[heap->num.size] __align(8);	/* C99 VLA, huha! */
@@ -128,7 +128,7 @@ int tt_heap_extract(struct tt_heap *heap, void *v)
 
 int tt_heap_init(struct tt_heap *heap)
 {
-	int ret = _tt_num_select(&heap->num);
+	int ret = _tt_key_select(&heap->num);
 	if (ret)
 		return ret;
 
