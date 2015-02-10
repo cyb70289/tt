@@ -1,3 +1,0 @@
-mainmenu "TT Configuration"
-
-source "src/Kconfig"

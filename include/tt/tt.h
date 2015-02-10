@@ -4,8 +4,7 @@
  */
 #pragma once
 
-/* Include auto generated header first */
-#include <generated/autoconf.h>
+#include "_config.h"
 
 #include <unistd.h>
 #include <stdio.h>

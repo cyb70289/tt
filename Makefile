@@ -48,7 +48,6 @@ ECHO		:= echo
 
 # Extra files to clean
 CLEAN_FILES	:=
-DISTCLEAN_FILES	:= .config* defconfig
 
 # Compiler flags
 CPPFLAGS	+= -g -O2 -fno-strict-aliasing
@@ -74,10 +73,6 @@ ifneq "$(filter %clean,$(MAKECMDGOALS))" ""
   # clean, distclean
   BUILD_IMAGE	:= 0
 endif
-ifneq "$(filter %config,$(MAKECMDGOALS))" ""
-  # config, menuconfig, ...
-  BUILD_IMAGE	:= 0
-endif
 
 # Short building messages
 show_msg = $(if $($(quiet)msg_$1),$(ECHO) $($(quiet)msg_$1)$2)
@@ -90,23 +85,6 @@ quiet_msg_clean	= "  CLEAN   "
 
 # Default target
 all:
-
-#################################################
-# Kconfig
-#################################################
-Kconfig		:= Kconfig
-include scripts/kconfig/config.mk
-ifeq "$(BUILD_IMAGE)" "1"
-  -include include/config/auto.conf
-  -include include/config/auto.conf.cmd
-endif
-
-# Regenerate if .config is updated
-include/config/%.conf: scripts/kconfig/conf .config include/config/auto.conf.cmd
-	@$(MKDIR) include/config include/generated
-	$< --silentoldconfig $(Kconfig)
-
-.config include/config/auto.conf.cmd:
 
 #################################################
 # Non-recursive build
@@ -157,10 +135,6 @@ define include-config
 
   DEPS += $$(call to-dep-file,$$(addprefix $1/,$$(obj-y)))
   LIBS += $$(addprefix $1/,$$(lib-y))
-
-  ifneq "$$(obj-y)" ""
-    $$(addprefix $1/,$$(obj-y)): include/config/auto.conf
-  endif
 
   $1/built-in.o: $$(addprefix $1/,$$(obj-y)) \
 		$$(addsuffix /built-in.o,$$(addprefix $1/,$$(dir-y)))
@@ -216,7 +190,7 @@ endif
 #################################################
 # Targets
 #################################################
-.PHONY: all install clean distclean
+.PHONY: all install clean
 
 all: $(LIBS) $(BINS)
 
@@ -226,11 +200,3 @@ clean:
 	$(Q)find src tests -name *.[oad] -o -name *.tmp | xargs $(RM)
 	$(Q)$(RM) $(LIBS) $(BINS)
 	@$(call show_msg,clean,src tests)
-
-distclean: clean
-	$(Q)find scripts/kconfig -name *.o | xargs $(RM)
-	@$(call show_msg,clean,scripts)
-	$(Q)$(RM) $(DISTCLEAN_FILES)
-	@$(call show_msg,clean,$(DISTCLEAN_FILES))
-	$(Q)$(RMDIR) include/generated include/config
-	@$(call show_msg,clean,include/generated include/config)
