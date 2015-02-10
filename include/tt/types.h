@@ -4,7 +4,11 @@
  */
 #pragma once
 
-#ifdef CONFIG_DOUBLE
+#ifndef HAVE_CONFIG_H
+#error "Include tt.h first!"
+#endif
+
+#if CONFIG_DOUBLE
 typedef double	tt_float;
 #else
 typedef float	tt_float;

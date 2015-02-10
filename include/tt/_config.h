@@ -2,6 +2,8 @@
  *
  * Copyright (C) 2015 Yibo Cai
  */
+#pragma once
+#define HAVE_CONFIG_H
 
 /* 1 - double, 0 - float */
 #define CONFIG_DOUBLE		1

@@ -4,6 +4,10 @@
  */
 #pragma once
 
+#ifndef HAVE_CONFIG_H
+#error "Include tt.h first!"
+#endif
+
 /* Log target */
 enum {
 	TT_LOG_TARGET_STDERR,
