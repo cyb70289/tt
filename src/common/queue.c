@@ -13,7 +13,7 @@ static int tt_queue_enque_array(struct tt_queue *queue, const void *e)
 {
 	if (queue->_count >= queue->cap) {
 		tt_debug("Overflow");
-		return -TT_EOVERFLOW;
+		return TT_EOVERFLOW;
 	}
 	memcpy(queue->_qtail, e, queue->esize);
 	queue->_qtail += queue->esize;
@@ -29,7 +29,7 @@ static int tt_queue_deque_array(struct tt_queue *queue, void *e)
 {
 	if (queue->_count == 0) {
 		tt_debug("Underflow");
-		return -TT_EUNDERFLOW;
+		return TT_EUNDERFLOW;
 	}
 	memcpy(e, queue->_qhead, queue->esize);
 	queue->_qhead += queue->esize;
@@ -46,7 +46,7 @@ static int tt_queue_enque_list(struct tt_queue *queue, const void *e)
 {
 	void *qe = malloc(sizeof(struct tt_list) + queue->esize);
 	if (!qe)
-		return -TT_EOVERFLOW;
+		return TT_EOVERFLOW;
 	memcpy(qe + sizeof(struct tt_list), e, queue->esize);
 	tt_list_add(qe, &queue->_head);
 
@@ -58,7 +58,7 @@ static int tt_queue_deque_list(struct tt_queue *queue, void *e)
 {
 	if (queue->_count == 0) {
 		tt_debug("Underflow");
-		return -TT_EUNDERFLOW;
+		return TT_EUNDERFLOW;
 	}
 	void *qe = queue->_head.next;
 	memcpy(e, qe + sizeof(struct tt_list), queue->esize);
@@ -75,7 +75,7 @@ int tt_queue_init(struct tt_queue *queue)
 		/* Allocate fixed array */
 		queue->_data = malloc(queue->esize * queue->cap);
 		if (!queue->_data)
-			return -TT_ENOMEM;
+			return TT_ENOMEM;
 		queue->_qhead = queue->_qtail = queue->_data;
 		queue->_enque = tt_queue_enque_array;
 		queue->_deque = tt_queue_deque_array;

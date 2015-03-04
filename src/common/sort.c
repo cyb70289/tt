@@ -68,7 +68,7 @@ static int tt_sort_merge(struct tt_sort_input *in, struct tt_sort_stat *stat)
 	/* Allocate copy buffer */
 	void *tmpbuf = malloc(in->count * in->num.size);
 	if (!tmpbuf)
-		return -TT_ENOMEM;
+		return TT_ENOMEM;
 	stat->space += in->count;
 
 	int l = 1;	/* subarray length */

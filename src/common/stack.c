@@ -13,7 +13,7 @@ static int tt_stack_push_array(struct tt_stack *stack, const void *e)
 {
 	if (stack->_count >= stack->cap) {
 		tt_debug("Overflow");
-		return -TT_EOVERFLOW;
+		return TT_EOVERFLOW;
 	}
 	memcpy(stack->_top, e, stack->esize);
 	stack->_top += stack->esize;
@@ -26,7 +26,7 @@ static int tt_stack_pop_array(struct tt_stack *stack, void *e)
 {
 	if (stack->_count == 0) {
 		tt_debug("Underflow");
-		return -TT_EUNDERFLOW;
+		return TT_EUNDERFLOW;
 	}
 	stack->_top -= stack->esize;
 	memcpy(e, stack->_top, stack->esize);
@@ -40,7 +40,7 @@ static int tt_stack_push_list(struct tt_stack *stack, const void *e)
 {
 	void *se = malloc(sizeof(struct tt_list) + stack->esize);
 	if (!se)
-		return -TT_EOVERFLOW;
+		return TT_EOVERFLOW;
 	memcpy(se + sizeof(struct tt_list), e, stack->esize);
 	tt_list_add(se, &stack->_head);
 
@@ -52,7 +52,7 @@ static int tt_stack_pop_list(struct tt_stack *stack, void *e)
 {
 	if (stack->_count == 0) {
 		tt_debug("Underflow");
-		return -TT_EUNDERFLOW;
+		return TT_EUNDERFLOW;
 	}
 	void *top = stack->_head.prev;
 	memcpy(e, top + sizeof(struct tt_list), stack->esize);
@@ -69,7 +69,7 @@ int tt_stack_init(struct tt_stack *stack)
 		/* Allocate fixed array */
 		stack->_data = malloc(stack->esize * stack->cap);
 		if (!stack->_data)
-			return -TT_ENOMEM;
+			return TT_ENOMEM;
 		stack->_top = stack->_data;
 		stack->_push = tt_stack_push_array;
 		stack->_pop = tt_stack_pop_array;

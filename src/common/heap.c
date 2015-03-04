@@ -102,7 +102,7 @@ int tt_heap_adjust(struct tt_heap *heap, int index, const void *v)
 	if ((heap->htype == TT_HEAP_MAX && d > 0) ||
 			(heap->htype == TT_HEAP_MIN && d < 0)) {
 		tt_error("Invalid new value");
-		return -TT_EINVAL;
+		return TT_EINVAL;
 	}
 
 	heap->_adjust(heap, index);
@@ -113,7 +113,7 @@ int tt_heap_adjust(struct tt_heap *heap, int index, const void *v)
 int tt_heap_extract(struct tt_heap *heap, void *v)
 {
 	if (heap->__heaplen == 0)
-		return -TT_EUNDERFLOW;
+		return TT_EUNDERFLOW;
 	heap->num._set(&heap->num, v, heap->data);
 
 	heap->__heaplen--;

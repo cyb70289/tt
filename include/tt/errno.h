@@ -1,14 +1,25 @@
-/* errno.h
+/* Error numbers
+ *
+ * Negative: fatal errors. Positive: un-fatal errors.
  *
  * Copyright (C) 2014 Yibo Cai
  */
 #pragma once
 
-#define TT_ENOMEM	1	/* Out of memory */
-#define TT_ESINGULAR	2	/* Singular matrix */
-#define TT_EPARAM	3	/* Error parameter */
-#define TT_EOVERFLOW	4	/* Overflow */
-#define TT_EUNDERFLOW	5	/* Underflow */
-#define TT_EINVAL	6	/* Invalid value */
-#define TT_ENOENT	7	/* No such entity */
-#define TT_ESTOP	8	/* Stopped */
+/* General */
+#define TT_ENOMEM		-1	/* Out of memory */
+#define TT_EINVAL		-2	/* Invalid parameter */
+#define TT_EOVERFLOW		-3	/* Buffer overflow */
+#define TT_EUNDERFLOW		-4	/* Buffer underflow */
+#define TT_ESTOP		 5	/* Stop operation */
+
+/* Numerical */
+#define TT_NUM_ESINGULAR	-101	/* Singular matrix */
+
+/* APN */
+#define TT_APN_EROUNDED		 201	/* Precision lost */
+#define TT_APN_EOVERFLOW	-202
+#define TT_APN_EUNDERFLOW	-203
+#define TT_APN_EDIV_0		-204
+#define TT_APN_EDIV_UNDEF	-205	/* 0 / 0 */
+#define TT_APN_EINVAL		-206	/* log(-1), operate NaN, ... */

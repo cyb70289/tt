@@ -92,7 +92,7 @@ static int tt_rbtree_insert(struct tt_bintree *tree, const void *key,
 {
 	struct tt_bintree_node *z = calloc(1, sizeof(struct tt_bintree_node));
 	if (!z)
-		return -TT_ENOMEM;
+		return TT_ENOMEM;
 	z->key = (void *)key;
 	z->data = (void *)v;
 	z->ext.color = TT_BINTREE_RED;
@@ -272,9 +272,9 @@ static int tt_rbtree_walk_in(const struct tt_bintree_node *node, void *context,
 {
 	while (node) {
 		if (tt_rbtree_walk_in(node->left, context, walk))
-			return -TT_ESTOP;
+			return TT_ESTOP;
 		if (!walk(node->key, node->data, context))
-			return -TT_ESTOP;
+			return TT_ESTOP;
 		node = node->right;
 	}
 
