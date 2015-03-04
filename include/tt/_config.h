@@ -23,3 +23,7 @@
  * v: built-in	-: discarded
  */
 #define CONFIG_DEBUG_LEVEL	2
+
+/* APN decimal significand length */
+#define CONFIG_APN_DIGITS	60		/* 25B */
+#define CONFIG_APN_DIGITS_MAX	100000000	/* 39.74MB */

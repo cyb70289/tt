@@ -13,7 +13,7 @@
 #include <stdbool.h>
 #include <inttypes.h>
 
-#include "types.h"
+#include "common.h"
 #include "errno.h"
 #include "macro.h"
 #include "log.h"

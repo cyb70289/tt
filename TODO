@@ -1,3 +1,6 @@
+- re-arrange header files
+- move dft to common, add fft
+- _tt_is_zero()
 - simd optimization
 - tt_stack, tt_queue: only ensures 8-bytes alignment
 - select, rank

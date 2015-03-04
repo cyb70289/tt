@@ -12,6 +12,7 @@
 #define TT_EOVERFLOW		-3	/* Buffer overflow */
 #define TT_EUNDERFLOW		-4	/* Buffer underflow */
 #define TT_ESTOP		 5	/* Stop operation */
+#define TT_ENOBUFS		-6	/* Buffer too small */
 
 /* Numerical */
 #define TT_NUM_ESINGULAR	-101	/* Singular matrix */

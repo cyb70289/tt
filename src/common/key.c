@@ -135,7 +135,7 @@ int _tt_key_select(struct tt_key *num)
 		num->swap = tt_swap_select(num->size);
 	if (!num->cmp) {
 		tt_error("No compare routine");
-		return -TT_EPARAM;
+		return TT_EINVAL;
 	}
 	num->_set = tt_set_select(num->size);
 
