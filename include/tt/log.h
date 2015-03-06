@@ -20,6 +20,7 @@ enum {
 /* Log level */
 enum {
 	TT_LOG_ERROR,
+	TT_LOG_WARN,
 	TT_LOG_INFO,
 	TT_LOG_DEBUG,
 
@@ -33,7 +34,7 @@ void tt_log_set_fd(int fd);
 
 void tt_log(int level, const char *func, const char *format, ...);
 
-#define tt_info(...)	tt_log(TT_LOG_INFO, __func__, __VA_ARGS__)
+#define tt_warn(...)	tt_log(TT_LOG_WARN, __func__, __VA_ARGS__)
 #define tt_error(...)	tt_log(TT_LOG_ERROR, __func__, __VA_ARGS__)
 
 #if (CONFIG_DEBUG_LEVEL == 0)
@@ -41,6 +42,7 @@ void tt_log(int level, const char *func, const char *format, ...);
 #define tt_assert(b)	do {} while (0)
 #define tt_assert_fa(b)	do {} while (0)
 #define tt_debug(...)	do {} while (0)
+#define tt_info(...)	do {} while (0)
 #else
 /* level > 0, assert(), tt_info() enabled */
 #define tt_assert(b)						\
@@ -51,6 +53,7 @@ void tt_log(int level, const char *func, const char *format, ...);
 			abort();				\
 		}						\
 	} while (0)
+#define tt_info(...)	tt_log(TT_LOG_INFO, __func__, __VA_ARGS__)
 #if (CONFIG_DEBUG_LEVEL == 1)
 /* level = 1, assert_fa(), debug() disabled */
 #define tt_assert_fa(b)	do {} while (0)

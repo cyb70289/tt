@@ -8,13 +8,14 @@
 
 static char level2char[] = {
 	[TT_LOG_ERROR]  = 'E',
+	[TT_LOG_WARN]   = 'W',
 	[TT_LOG_INFO]   = 'I',
 	[TT_LOG_DEBUG]  = 'D',
 };
 
 static int __target = TT_LOG_TARGET_STDERR;
-static int __level = CONFIG_DEBUG_LEVEL;
 static int __fd = -1;
+static int __level = TT_LOG_DEBUG;
 
 void tt_log_set_target(int target)
 {
@@ -63,6 +64,8 @@ void tt_log(int level, const char *func, const char *format, ...)
 	case TT_LOG_TARGET_STDERR:
 		if (level == TT_LOG_ERROR)
 			prefix = "\x1B[1;31m";	/* Red bold */
+		else if (level == TT_LOG_WARN)
+			prefix = "\x1B[1;33m";	/* Yellow bold */
 		else if (level == TT_LOG_INFO)
 			prefix = "\x1B[1;37m";  /* White bold */
 		if (prefix[0])
