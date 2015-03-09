@@ -3,8 +3,8 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/heap.h>
-#include "common.h"
+#include <tt/common/heap.h>
+#include "lib.h"
 
 /* Heap with N elements
  * - Leaf elements: [N/2] ~ [N-1]
@@ -62,7 +62,7 @@ static inline void tt_heap_adjust_internal(
 		int (*cmp)(const struct tt_key *, const void *, const void*))
 {
 	/* Buffer for one element */
-	char tmp[heap->num.size] __align(8);	/* C99 VLA, huha! */
+	char tmp[heap->num.size] _tt_align(8);	/* C99 VLA, huha! */
 	void *v = heap_ptr(heap, index);
 	heap->num._set(&heap->num, tmp, v);
 

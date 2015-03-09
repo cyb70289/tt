@@ -1,8 +1,10 @@
-/* tree.h
+/* Tree
  *
  * Copyright (C) 2014 Yibo Cai
  */
 #pragma once
+
+#include "_key.h"
 
 enum tt_bintree_color {
 	TT_BINTREE_RED,

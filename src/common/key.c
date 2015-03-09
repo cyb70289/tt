@@ -4,6 +4,7 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
+#include <tt/common/_key.h>
 
 #include <string.h>
 

@@ -5,7 +5,7 @@
 #pragma once
 
 /* Get element m[row][col] */
-static inline tt_float *_tt_mtx_el(const struct tt_mtx *m, int row, int col)
+static inline double *_tt_mtx_el(const struct tt_mtx *m, int row, int col)
 {
 	tt_assert_fa(row < m->rows);
 	tt_assert_fa(col < m->cols);
@@ -14,7 +14,7 @@ static inline tt_float *_tt_mtx_el(const struct tt_mtx *m, int row, int col)
 }
 
 /* Get m[row][] pointer */
-static inline tt_float *_tt_mtx_row(const struct tt_mtx *m, int row)
+static inline double *_tt_mtx_row(const struct tt_mtx *m, int row)
 {
 	tt_assert_fa(row < m->rows);
 

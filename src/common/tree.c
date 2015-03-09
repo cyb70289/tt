@@ -3,8 +3,8 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/tree.h>
-#include "common.h"
+#include <tt/common/tree.h>
+#include "lib.h"
 
 #include <string.h>
 

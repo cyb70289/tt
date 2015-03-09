@@ -8,7 +8,7 @@
 struct tt_mtx {
 	int rows;
 	int cols;
-	tt_float *v;
+	double *v;
 };
 
 /* Matrix multiplication

@@ -3,7 +3,7 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/num/dsp.h>
+#include <tt/num/dft.h>
 #include <tt/num/complex.h>
 #include "num.h"
 
@@ -19,19 +19,19 @@
  *
  * in, out: [real1, image1, real2, image2, ..., realN, imageN]
  */
-int tt_dft(tt_float (*in)[2], tt_float (*out)[2], int N)
+int tt_dft(double (*in)[2], double (*out)[2], int N)
 {
 	tt_assert(N);
 
-	tt_float em = 0;
-	tt_float edelta = 2 * _TT_PI / N;
+	double em = 0;
+	double edelta = 2 * _TT_PI / N;
 	for (int m = 0; m < N; m++) {
 		out[m][0] = out[m][1] = 0;
 
-		tt_float emn = 0;
+		double emn = 0;
 		for (int n = 0; n < N; n++) {
-			tt_float e[2] = { cos(emn), -sin(emn) };
-			tt_float t[2];
+			double e[2] = { cos(emn), -sin(emn) };
+			double t[2];
 			tt_complex_mul(in[n], e, t);
 			out[m][0] += t[0];
 			out[m][1] += t[1];
@@ -55,19 +55,19 @@ int tt_dft(tt_float (*in)[2], tt_float (*out)[2], int N)
  *
  * in, out: [real1, image1, real2, image2, ..., realN, imageN]
  */
-int tt_idft(tt_float (*in)[2], tt_float (*out)[2], int N)
+int tt_idft(double (*in)[2], double (*out)[2], int N)
 {
 	tt_assert(N);
 
-	tt_float en = 0;
-	tt_float edelta = 2 * _TT_PI / N;
+	double en = 0;
+	double edelta = 2 * _TT_PI / N;
 	for (int n = 0; n < N; n++) {
 		out[n][0] = out[n][1] = 0;
 
-		tt_float enm = 0;
+		double enm = 0;
 		for (int m = 0; m < N; m++) {
-			tt_float e[2] = { cos(enm), sin(enm) };
-			tt_float t[2];
+			double e[2] = { cos(enm), sin(enm) };
+			double t[2];
 			tt_complex_mul(in[m], e, t);
 			out[n][0] += t[0];
 			out[n][1] += t[1];

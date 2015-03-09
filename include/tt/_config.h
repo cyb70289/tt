@@ -2,11 +2,8 @@
  *
  * Copyright (C) 2015 Yibo Cai
  */
-#pragma once
-#define HAVE_CONFIG_H
-
-/* 1 - double, 0 - float */
-#define CONFIG_DOUBLE		1
+#ifndef HAVE_TT_CONFIG_H
+#define HAVE_TT_CONFIG_H
 
 /* 0 - no assertions
  * 1 - assertions in fast path are dropped
@@ -27,3 +24,5 @@
 /* APN decimal significand length */
 #define CONFIG_APN_DIGITS	60		/* 25B */
 #define CONFIG_APN_DIGITS_MAX	100000000	/* 39.74MB */
+
+#endif	/* HAVE_TT_CONFIG_H */

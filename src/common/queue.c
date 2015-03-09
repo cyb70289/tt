@@ -3,8 +3,7 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/list.h>
-#include <tt/queue.h>
+#include <tt/common/queue.h>
 
 #include <string.h>
 

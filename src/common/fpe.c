@@ -4,6 +4,7 @@
  */
 #define _GNU_SOURCE
 #include <tt/tt.h>
+#include "lib.h"
 
 #include <signal.h>
 #include <string.h>

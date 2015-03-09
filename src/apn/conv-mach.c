@@ -4,8 +4,9 @@
  */
 #include <tt/tt.h>
 #include <tt/apn/apn.h>
-#include "common.h"
-#include "../common/common.h"
+#include <tt/common/round.h>
+#include <common/lib.h>
+#include "apn.h"
 
 #include <string.h>
 #include <endian.h>

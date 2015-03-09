@@ -3,7 +3,8 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/heap.h>
+#include <tt/common/heap.h>
+#include <common/lib.h>
 
 struct pair {
 	int	si;	/* list index */

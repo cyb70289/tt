@@ -1,8 +1,10 @@
-/* sort.h
+/* Sorting
  *
  * Copyright (C) 2014 Yibo Cai
  */
 #pragma once
+
+#include "_key.h"
 
 enum tt_sort_alg {
 	TT_SORT_INSERT,

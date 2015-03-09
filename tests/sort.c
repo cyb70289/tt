@@ -3,7 +3,7 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/sort.h>
+#include <tt/common/sort.h>
 
 #include <string.h>
 #include <time.h>

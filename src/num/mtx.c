@@ -22,10 +22,10 @@ int tt_mtx_mul(const struct tt_mtx *mi1, const struct tt_mtx *mi2,
 	tt_assert(mo->cols == mi2->cols);
 
 	for (int i = 0; i < mi1->rows; i++) {
-		tt_float *v1 = _tt_mtx_row(mi1, i);
+		double *v1 = _tt_mtx_row(mi1, i);
 		for (int j = 0; j < mi2->cols; j++) {
-			tt_float o = 0.0f;
-			tt_float *v2 = _tt_mtx_el(mi2, 0, j);
+			double o = 0.0f;
+			double *v2 = _tt_mtx_el(mi2, 0, j);
 			for (int k = 0; k < mi1->cols; k++) {
 				o += (*v1) * (*v2);
 				v1++;

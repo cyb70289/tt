@@ -3,9 +3,9 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/sort.h>
-#include <tt/heap.h>
-#include "common.h"
+#include <tt/common/sort.h>
+#include <tt/common/heap.h>
+#include "lib.h"
 
 #include <string.h>
 
@@ -29,7 +29,7 @@ struct tt_sort_stat {
 static int tt_sort_insert(struct tt_sort_input *in, struct tt_sort_stat *stat)
 {
 	/* Allocate buffer for one temporary element */
-	char tmp[in->num.size] __align(8);
+	char tmp[in->num.size] _tt_align(8);
 	stat->space += 1;
 
 	void *p = in->data;
@@ -79,7 +79,7 @@ static int tt_sort_merge(struct tt_sort_input *in, struct tt_sort_stat *stat)
 		int head = 0, mid, end;
 		do {
 			mid = head + l - 1;
-			end = tt_min(mid + l, in->count - 1);
+			end = _tt_min(mid + l, in->count - 1);
 
 			/* Merge [head]~[mid] with [mid+1]~[end] */
 			int p = head, p1 = head, p2 = mid + 1;
@@ -175,7 +175,7 @@ static int tt_sort_quick(struct tt_sort_input *in, struct tt_sort_stat *stat)
 		stat->space = stat->depth;
 
 	/* Buffer to hold pivot value */
-	char pivot[in->num.size] __align(8);
+	char pivot[in->num.size] _tt_align(8);
 
 	int p = stat->head;
 	int r = stat->tail;
@@ -246,7 +246,7 @@ static int tt_sort_quick(struct tt_sort_input *in, struct tt_sort_stat *stat)
 		 *  vp    pa      pc pb       pd   rp
 		 */
 
-		int l = tt_min(pa - vp, pb - pa);
+		int l = _tt_min(pa - vp, pb - pa);
 		void *vt = pb - l;
 		while (l) {
 			in->num.swap(&in->num, vp, vt);
@@ -255,7 +255,7 @@ static int tt_sort_quick(struct tt_sort_input *in, struct tt_sort_stat *stat)
 			l -= in->num.size;
 			stat->time++;
 		}
-		l = tt_min(pd - pc, vr - pd);
+		l = _tt_min(pd - pc, vr - pd);
 		vt = pb;
 		vr -= (l - in->num.size);
 		while (l) {

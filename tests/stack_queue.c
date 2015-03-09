@@ -3,8 +3,8 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/stack.h>
-#include <tt/queue.h>
+#include <tt/common/stack.h>
+#include <tt/common/queue.h>
 
 #define LEN	16
 

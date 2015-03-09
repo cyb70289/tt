@@ -11,7 +11,7 @@ int main(void)
 {
 	int r;
 	struct tt_mtx m, b, b2;
-	tt_float vm[6][6] = {
+	double vm[6][6] = {
 		{ 10, 15, 11, 6, 1, 1 },
 		{ 106, 15, 114, 63, 12, 11 },
 		{ 1, -82, 83, -4, 5, -86 },
@@ -19,12 +19,12 @@ int main(void)
 		{ 11, 61, 21, 401, 355, 511 },
 		{ 50, 30, 40, 20, 60, 10 },
 	};
-	tt_float vb[6] = { 100, 99, 101, 98, -200, -321 };
-	tt_float vm2[6][6];
+	double vb[6] = { 100, 99, 101, 98, -200, -321 };
+	double vm2[6][6];
 	memcpy(vm2, vm, sizeof(vm));
 
 	m.cols = m.rows = 6;
-	m.v = (tt_float *)vm;
+	m.v = (double *)vm;
 
 	b.cols = 1;
 	b.rows = 6;
@@ -42,10 +42,10 @@ int main(void)
 		printf("\n");
 	}
 
-	m.v = (tt_float *)vm2;
+	m.v = (double *)vm2;
 	b2.cols = 1;
 	b2.rows = 6;
-	tt_float vb2[6];
+	double vb2[6];
 	b2.v = vb2;
 	tt_mtx_mul(&m, &b, &b2);
 	for (i = 0; i < 6; i++)

@@ -1,9 +1,9 @@
-/* common.c
+/* Common libs
  *
  * Copyright (C) 2015 Yibo Cai
  */
 #include <tt/tt.h>
-#include "common.h"
+#include "lib.h"
 
 #include <stdlib.h>
 

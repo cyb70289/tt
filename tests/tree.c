@@ -3,7 +3,8 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/tree.h>
+#include <tt/common/tree.h>
+#include <common/lib.h>
 
 #include <string.h>
 
@@ -65,7 +66,7 @@ static int tree_height(const struct tt_bintree_node *node)
 {
 	if (!node)
 		return 0;
-	return tt_max(tree_height(node->left), tree_height(node->right)) + 1;
+	return _tt_max(tree_height(node->left), tree_height(node->right)) + 1;
 }
 
 int main(void)

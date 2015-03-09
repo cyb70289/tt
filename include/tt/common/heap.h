@@ -4,6 +4,8 @@
  */
 #pragma once
 
+#include "_key.h"
+
 enum tt_heap_type {
 	TT_HEAP_MAX,
 	TT_HEAP_MIN,

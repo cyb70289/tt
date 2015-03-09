@@ -4,7 +4,7 @@
  */
 #pragma once
 
-#ifndef HAVE_CONFIG_H
+#ifndef HAVE_TT_CONFIG_H
 #error "Include tt.h first!"
 #endif
 
@@ -33,6 +33,8 @@ void tt_log_set_level(int level);
 void tt_log_set_fd(int fd);
 
 void tt_log(int level, const char *func, const char *format, ...);
+
+#define __unlikely(x)	(__builtin_expect(!!(x), 0))
 
 #define tt_warn(...)	tt_log(TT_LOG_WARN, __func__, __VA_ARGS__)
 #define tt_error(...)	tt_log(TT_LOG_ERROR, __func__, __VA_ARGS__)

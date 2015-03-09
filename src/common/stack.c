@@ -3,8 +3,7 @@
  * Copyright (C) 2014 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/list.h>
-#include <tt/stack.h>
+#include <tt/common/stack.h>
 
 #include <string.h>
 

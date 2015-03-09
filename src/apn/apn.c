@@ -1,11 +1,11 @@
-/* common.c
+/* Helpers
  *
  * Copyright (C) 2015 Yibo Cai
  */
 #include <tt/tt.h>
 #include <tt/apn/apn.h>
-#include <tt/atomic.h>
-#include "common.h"
+#include <common/atomic.h>
+#include "apn.h"
 
 #include <string.h>
 #include <pthread.h>
@@ -86,7 +86,7 @@ uint _tt_apn_b10_to_d3_2(uint bit10, uchar *dec3)
 	if (bit10_to_dec3 == NULL) {
 		pthread_mutex_lock(&mtx);
 
-		tt_sync_barrier();
+		_tt_sync_barrier();
 		if (bit10_to_dec3 == NULL) {
 			uchar (*tbl)[3] = malloc(1000 * sizeof(*bit10_to_dec3));
 			for (int i = 0; i < 1000; i++) {
@@ -97,7 +97,7 @@ uint _tt_apn_b10_to_d3_2(uint bit10, uchar *dec3)
 				tbl[i][2] = n / 10;
 			}
 			bit10_to_dec3 = (const uchar (*)[3])tbl;
-			tt_sync_barrier();
+			_tt_sync_barrier();
 		}
 
 		pthread_mutex_unlock(&mtx);

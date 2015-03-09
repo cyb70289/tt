@@ -3,6 +3,7 @@
  * Copyright (C) 2015 Yibo Cai
  */
 #include <tt/tt.h>
+#include <tt/common/round.h>
 
 /* Default: round half to even */
 static int _rounding = TT_ROUND_HALF_EVEN;

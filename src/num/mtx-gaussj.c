@@ -38,14 +38,14 @@ int tt_mtx_gaussj(struct tt_mtx *ma, struct tt_mtx *mb)
 	for (int row = 0; row < ma->rows; row++) {
 		/* Find pivot */
 		int rowp = 0, colp = 0;
-		tt_float max = 0.0f;
+		double max = 0.0f;
 		for (i = 0; i < ma->rows; i++) {
 			if (row_processed[i])
 				continue;
 			for (j = 0; j < ma->cols; j++) {
 				if (col_processed[j])
 					continue;
-				tt_float v = fabs(*_tt_mtx_el(ma, i, j));
+				double v = fabs(*_tt_mtx_el(ma, i, j));
 				if (v > max) {
 					max = v;
 					rowp = i;
@@ -75,9 +75,9 @@ int tt_mtx_gaussj(struct tt_mtx *ma, struct tt_mtx *mb)
 				continue;
 
 			/* Process coefficient matrix [ma] */
-			tt_float *v = _tt_mtx_row(ma, i);
-			tt_float *vp = _tt_mtx_row(ma, rowp);
-			tt_float _1 = v[colp];
+			double *v = _tt_mtx_row(ma, i);
+			double *vp = _tt_mtx_row(ma, rowp);
+			double _1 = v[colp];
 			for (j = 0; j < ma->cols; j++) {
 				/* Ignore processed and current column */
 				if (col_processed[j] || j == colp)
