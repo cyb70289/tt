@@ -28,17 +28,14 @@ struct tt_apn {
 	uint _digsz;	/* Memory size of _dig[] in bytes */
 	uint _msb;	/* Current decimal digit count */
 	union {
-		uchar _dig8[0];
-		ushort _dig16[0];
-		uint _dig32[0];
-	};		/* Significand buffer. Must be last member! */
+		uchar *_dig8;
+		ushort *_dig16;
+		uint *_dig32;
+	};		/* Significand buffer */
 };
 
 struct tt_apn *tt_apn_alloc(uint prec);
-static inline void tt_apn_free(struct tt_apn *apn)
-{
-	free(apn);
-}
+void tt_apn_free(struct tt_apn *apn);
 
 /* Conversion */
 int tt_apn_from_string(struct tt_apn *apn, const char *str);

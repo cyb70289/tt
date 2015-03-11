@@ -36,17 +36,25 @@ struct tt_apn *tt_apn_alloc(uint prec)
 	digsz &= ~3;
 
 	/* Create APN */
-	struct tt_apn *apn = calloc(1, sizeof(struct tt_apn) + digsz);
-	if (apn == NULL) {
+	struct tt_apn *apn = calloc(1, sizeof(struct tt_apn));
+	apn->_dig32 = calloc(digsz / 4, 4);
+	if (apn->_dig32 == NULL) {
 		tt_error("Not enough memory");
+		free(apn);
 		return NULL;
 	}
-	apn->_msb = 1;
 	apn->_prec = prec;
 	apn->_digsz = digsz;
+	apn->_msb = 1;
 	tt_debug("APN created: %u bytes", apn->_digsz);
 
 	return apn;
+}
+
+void tt_apn_free(struct tt_apn *apn)
+{
+	free(apn->_dig32);
+	free(apn);
 }
 
 /* apn = 0 */
