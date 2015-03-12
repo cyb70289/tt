@@ -22,7 +22,7 @@
 #define CONFIG_DEBUG_LEVEL	2
 
 /* APN decimal significand length */
-#define CONFIG_APN_DIGITS	60		/* 25B */
-#define CONFIG_APN_DIGITS_MAX	100000000	/* 39.74MB */
+#define CONFIG_APN_DIGITS	60		/* 28B */
+#define CONFIG_APN_DIGITS_MAX	100000000	/* 42MB */
 
 #endif	/* HAVE_TT_CONFIG_H */

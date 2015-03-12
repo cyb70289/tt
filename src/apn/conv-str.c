@@ -10,23 +10,20 @@
 
 #include <string.h>
 #include <math.h>
-#include <endian.h>
 
-static void d3_to_b10(const uchar *dec3, uint **dig32, int *ptr)
+static void d3_fill(const uchar *dec3, uint **dig32, int *ptr)
 {
-	uint b10 = htole32(_tt_apn_d3_to_b10_2(dec3));
+	uint b10 = htole32(_tt_apn_from_d3(dec3));
 	**dig32 |= (b10 << *ptr);
-	*ptr += 10;
-	if (*ptr >= 32) {
-		*ptr -= 32;
+	*ptr += 11;
+	if (*ptr > 32) {
+		*ptr = 0;
 		(*dig32)++;
-		if (*ptr)
-			**dig32 |= (b10 >> (10 - *ptr));
 	}
 }
 
-static int parse_coef(struct tt_apn *apn, const char *s, int len,
-		int *adjexp, int *adjrnd)
+static int parse_coef(struct tt_apn *apn, const char *s, int len, int *adjexp,
+		int *adjrnd)
 {
 	int ret = 0;
 
@@ -61,7 +58,7 @@ static int parse_coef(struct tt_apn *apn, const char *s, int len,
 		tt_warn("APN rounded: %d -> %d", digs, apn->_prec);
 		ret = TT_APN_EROUNDED;
 
-		/* Drop trailing digis */
+		/* Drop trailing digits */
 		int drops = digs - apn->_prec;
 		apn->_msb -= drops;
 		*adjexp += drops;
@@ -95,7 +92,7 @@ static int parse_coef(struct tt_apn *apn, const char *s, int len,
 			dec3[cnt++] = (*s2 - '0');
 			if (cnt == 3) {
 				cnt = 0;
-				d3_to_b10(dec3, &dig32, &ptr);
+				d3_fill(dec3, &dig32, &ptr);
 			}
 		}
 		s2--;
@@ -104,7 +101,7 @@ static int parse_coef(struct tt_apn *apn, const char *s, int len,
 	if (cnt) {
 		while (cnt < 3)
 			dec3[cnt++] = 0;
-		d3_to_b10(dec3, &dig32, &ptr);
+		d3_fill(dec3, &dig32, &ptr);
 	}
 
 	return ret;
@@ -157,7 +154,7 @@ int tt_apn_from_string(struct tt_apn *apn, const char *str)
 	}
 	apn->_exp = _exp + adjexp;
 
-	/* Round */
+	/* Rounding */
 	if (adjrnd)
 		_tt_apn_round_adj(apn);
 
@@ -229,37 +226,33 @@ int tt_apn_to_string(const struct tt_apn *apn, char *str, uint len)
 			*str++ = '0';
 	}
 
-	/* Get valid bits */
-	uint bits = apn->_msb + 2;
-	bits /= 3;
-	bits *= 10;
 	/* Get valid uints */
-	uint uints = bits + 31;
-	uints /= 32;
+	int uints = (apn->_msb + 8) / 9;
+	/* Point to first 3-decimals */
+	int ptr = apn->_msb - (uints - 1) * 9;
+	tt_assert(ptr >= 1 && ptr <= 9);
+	ptr--;
+	ptr /= 3;
+	ptr *= 11;
 
 	/* Generate coefficient */
 	bool first = true;
 	uint bit10;
 	const uint *dig32 = apn->_dig32 + uints - 1;
-	int ptr = bits % 32;
 	int digs = 0;
 	while (digs < apn->_msb) {
-		/* Cut 10 bits */
-		if (ptr < 10) {
-			/* Across two uints */
-			bit10 = (*dig32) << (10 - ptr);
-			ptr += (32 - 10);
+		/* Cut 10 bits: ptr ~ ptr+9 */
+		bit10 = (*dig32) >> ptr;
+		bit10 &= 0x3FF;
+		ptr -= 11;
+		if (ptr < 0) {
+			ptr = 22;
 			dig32--;
-			bit10 |= (*dig32) >> ptr;
-		} else {
-			/* In one uint */
-			ptr -= 10;
-			bit10 = (*dig32) >> ptr;
 		}
 
 		/* Change to 3 decimals */
 		uchar dec3[3];
-		_tt_apn_b10_to_d3_2(le32toh(bit10 & 0x3FF), dec3);
+		_tt_apn_to_d3(le32toh(bit10), dec3);
 		if (first) {
 			/* Skip leading 0 */
 			if (dec3[2]) {

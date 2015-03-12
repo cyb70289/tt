@@ -10,28 +10,36 @@
 
 /* Arbitrary precision decimal: { sign, dig, exp } = (-1)^sign * dig * 10^exp
  * +3.14  -> *dig = 314,  exp = -2, sign = 0, msb = 3
- * +0.220 -> *dig = 220,  exp = -3, sign = 0, msb = 2
+ * +0.220 -> *dig = 220,  exp = -3, sign = 0, msb = 3
  * -0.003 -> *dig = 3,    exp = -3, sign = 1, msb = 1
  * 123400 -> *dig = 1234, exp = 2,  sign = 0, msb = 4
  * 0      -> *dig = 0,    exp = 0,  sign = 0, msb = 1
  * 0.00   -> *dig = 0,    exp = -2, sign = 0, msb = 1
  */
 struct tt_apn {
-	short _sign;	/* Sign: 0, 1 */
-	short _inf_nan;	/* 1 - Inf, 2 - NaN */
+	short _sign;		/* Sign: 0, 1 */
+	short _inf_nan;		/* 1 - Inf, 2 - NaN */
 #define TT_APN_INF	1
 #define TT_APN_NAN	2
 
-	int _exp;	/* Decimal exponent */
-	uint _prec;	/* Precision: maximum significant decimal digits */
+	int _exp;		/* Decimal exponent */
+	const uint _prec;	/* Precision: maximum significant digits */
+#define TT_APN_EXT_PREC	9	/* Extra precison digits for rounding guard */
 
-	uint _digsz;	/* Memory size of _dig[] in bytes */
-	uint _msb;	/* Current decimal digit count */
-	union {
-		uchar *_dig8;
-		ushort *_dig16;
-		uint *_dig32;
-	};		/* Significand buffer */
+	const uint _digsz;	/* Bytes of _dig[] */
+	uint _msb;		/* Current decimal digit count
+				 * - must be <= _prec after calculation
+				 * - may exceed _prec by EXT_PREC in calculation
+				 */
+	uint *_dig32;		/* Significand buffer
+				 * Bit -> 31      22 21 20     11 10 9       0
+				 *        +--------+---+--------+---+--------+
+				 * Val -> | digit3 | G | digit2 | G | digit1 |
+				 *        +--------+---+--------+---+--------+
+				 * - Each uint contains three 3-digit decimals
+				 * - Bit-10,21 guard add/sub overflow
+				 * - Stored in little endian
+				 */
 };
 
 struct tt_apn *tt_apn_alloc(uint prec);

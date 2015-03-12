@@ -9,7 +9,6 @@
 #include "apn.h"
 
 #include <string.h>
-#include <endian.h>
 #include <math.h>
 
 /* Convert num(>0) to [10^18, 10^19), return adjusted exponent.
@@ -66,7 +65,7 @@ int tt_apn_from_uint(struct tt_apn *apn, uint64_t num)
 	uint *dig32 = apn->_dig32;
 	while (num) {
 		/* Get 3 decimals */
-		ushort dec3 = num % 1000;
+		uint dec3 = num % 1000;
 		num /= 1000;
 
 		/* Increment significand */
@@ -77,16 +76,13 @@ int tt_apn_from_uint(struct tt_apn *apn, uint64_t num)
 		else
 			apn->_msb++;
 
-		/* Change to 10 bits */
-		uint apn10b = htole32(_tt_apn_d3_to_b10(dec3));
-		*dig32 |= (apn10b << ptr);
-		ptr += 10;
-		if (ptr >= 32) {
-			/* To next uint */
-			ptr -= 32;
+		/* Fill digit buffer */
+		uint bit10 = htole32(dec3);
+		*dig32 |= (bit10 << ptr);
+		ptr += 11;
+		if (ptr > 32) {
+			ptr = 0;
 			dig32++;
-			if (ptr)
-				*dig32 |= (apn10b >> (10 - ptr));
 		}
 	}
 
