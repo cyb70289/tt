@@ -14,4 +14,3 @@ enum {
 };
 
 int tt_set_rounding(uint rnd);
-int tt_round(int odd, uint dig, uint rnd);

@@ -47,7 +47,7 @@ static int norm_fp_to_i64(double num, uint64_t *ui64)
 	tt_assert(lnum >= _lower && lnum < _upper);
 
 	*ui64 = (uint64_t)lnum;
-	*ui64 += tt_round((*ui64) & 1, (uint)((lnum - *ui64) * 10),
+	*ui64 += _tt_round((*ui64) & 1, (uint)((lnum - *ui64) * 10),
 			TT_ROUND_HALF_AWAY0);
 
 	return adjexp;
@@ -77,8 +77,7 @@ int tt_apn_from_uint(struct tt_apn *apn, uint64_t num)
 			apn->_msb++;
 
 		/* Fill digit buffer */
-		uint bit10 = htole32(dec3);
-		*dig32 |= (bit10 << ptr);
+		*dig32 |= (dec3 << ptr);
 		ptr += 11;
 		if (ptr > 32) {
 			ptr = 0;

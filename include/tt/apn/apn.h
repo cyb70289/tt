@@ -23,22 +23,23 @@ struct tt_apn {
 #define TT_APN_NAN	2
 
 	int _exp;		/* Decimal exponent */
-	const uint _prec;	/* Precision: maximum significant digits */
-#define TT_APN_EXT_PREC	9	/* Extra precison digits for rounding guard */
-
+	const int _prec;	/* Precision: maximum significant digits */
+	const int _prec_full;	/* Full precision digits used internally */
+#define TT_APN_PREC_RND	9	/* Extra precison digits for rounding guard */
+#define TT_APN_PREC_CRY	1	/* Carry digit */
+#define TT_APN_PREC_ALN	8	/* Append to align-9 shifting */
 	const uint _digsz;	/* Bytes of _dig[] */
-	uint _msb;		/* Current decimal digit count
+	int _msb;		/* Current decimal digit count
 				 * - must be <= _prec after calculation
 				 * - may exceed _prec by EXT_PREC in calculation
 				 */
 	uint *_dig32;		/* Significand buffer
 				 * Bit -> 31      22 21 20     11 10 9       0
 				 *        +--------+---+--------+---+--------+
-				 * Val -> | digit3 | G | digit2 | G | digit1 |
+				 * Val -> | digit3 | C | digit2 | C | digit1 |
 				 *        +--------+---+--------+---+--------+
 				 * - Each uint contains three 3-digit decimals
-				 * - Bit-10,21 guard add/sub overflow
-				 * - Stored in little endian
+				 * - Bit-10,21 carry guard
 				 */
 };
 
@@ -51,3 +52,13 @@ int tt_apn_from_sint(struct tt_apn *apn, int64_t num);
 int tt_apn_from_uint(struct tt_apn *apn, uint64_t num);
 int tt_apn_from_float(struct tt_apn *apn, double num);
 int tt_apn_to_string(const struct tt_apn *apn, char *str, uint len);
+
+/* Operations */
+int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
+		const struct tt_apn *src2);
+int tt_apn_sub(struct tt_apn *dst, const struct tt_apn *src1,
+		const struct tt_apn *src2);
+int tt_apn_mul(struct tt_apn *dst, const struct tt_apn *src1,
+		const struct tt_apn *src2);
+int tt_apn_div(struct tt_apn *dst, const struct tt_apn *src1,
+		const struct tt_apn *src2);

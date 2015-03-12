@@ -7,8 +7,21 @@
 
 #include <stdlib.h>
 
-/* Calculate decimal digits */
-int _tt_digits(long long int n)
+/* Calculate decimal digits (n >= 0) */
+int _tt_digits(int n)
+{
+	int d = 1;
+	n /= 10;
+
+	while (n) {
+		n /= 10;
+		d++;
+	}
+
+	return d;
+}
+
+int _tt_digits_ll(long long int n)
 {
 	int d = 1;
 	n /= 10;

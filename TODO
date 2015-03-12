@@ -1,3 +1,8 @@
+- apn test case
+- buffer management: _tt_get_buf, _tt_put_buf
+- implement _from_d3, _to_d3 with LUT
+- test on big endian machine
+- add makefile config to set arch
 - _tt_is_zero()
 - simd optimization
 - tt_stack, tt_queue: only ensures 8-bytes alignment

@@ -22,8 +22,14 @@ struct tt_apn *tt_apn_alloc(uint prec)
 		return NULL;
 	}
 
+	/* Check digit buffer size */
+	int prec_full = prec;
+        prec_full += TT_APN_PREC_RND;	/* Rounding guard */
+	prec_full += TT_APN_PREC_CRY;	/* Carry digit */
+	prec_full += TT_APN_PREC_ALN;	/* Align-9 shifting */
+
 	/* 9 digits -> 4 bytes */
-	uint digsz = prec + TT_APN_EXT_PREC;	/* Extra prec for rounding */
+	int digsz = prec_full;
 	digsz += 8;
 	digsz /= 9;
 	digsz *= 4;
@@ -36,7 +42,8 @@ struct tt_apn *tt_apn_alloc(uint prec)
 		free(apn);
 		return NULL;
 	}
-	*(uint*)&apn->_prec = prec;
+	*(int*)&apn->_prec = prec;
+	*(int*)&apn->_prec_full = prec_full;
 	*(uint*)&apn->_digsz = digsz;
 	apn->_msb = 1;
 	tt_debug("APN created: %u bytes", apn->_digsz);
@@ -90,6 +97,17 @@ void _tt_apn_to_d3(uint bit10, uchar *dec3)
  */
 int _tt_apn_round_adj(struct tt_apn *apn)
 {
-	/* TODO */
-	return 0;
+	/* Construct { apn->_sign, 1, apn->_exp } */
+	uint one = 1;
+	struct tt_apn apn_1 = {
+		._sign = apn->_sign,
+		._inf_nan = 0,
+		._exp = apn->_exp,
+		._prec = 1,
+		._digsz = sizeof(one),
+		._msb = 1,
+		._dig32 = &one,
+	};
+
+	return tt_apn_add(apn, apn, &apn_1);
 }

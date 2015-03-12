@@ -28,10 +28,8 @@ int tt_set_rounding(uint rnd)
  * - rnd: rounding method, 0 - use current method
  * - return: 0 - drop, 1 - increment abs
  */
-int tt_round(int odd, uint dig, uint rnd)
+int _tt_round(int odd, uint dig, int rnd)
 {
-	tt_assert(rnd < TT_ROUND_MAX);
-
 	if (dig < 5)
 		return 0;
 	else if (dig > 5)

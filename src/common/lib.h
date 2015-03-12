@@ -29,6 +29,8 @@
 		(b) = xyz_t;			\
 	} while (0)
 
+#define BIT(n)	(1U << (n))
+
 #define ARRAY_SIZE(x)	(sizeof(x) / sizeof((x)[0]))
 
 #define offset_of(TYPE, MEMBER)		((size_t) &((TYPE *)0)->MEMBER)
@@ -46,7 +48,19 @@ struct tt_key;
 int _tt_key_select(struct tt_key *num);
 
 /* Count decimal digits */
-int _tt_digits(long long int n);
+int _tt_digits(int n);
+int _tt_digits_ll(long long int n);
 
 /* String to integer */
 int _tt_atoi(const char *str, int *i);
+
+/* Add,sub and return carry */
+uint _tt_add_uint(uint a, uint b, char *c);
+uint _tt_sub_uint(uint a, uint b, char *c);
+
+/* Buffer management */
+void *_tt_get_buf(size_t sz);
+void _tt_put_buf(void *buf);
+
+/* Rounding */
+int _tt_round(int odd, uint dig, int rnd);

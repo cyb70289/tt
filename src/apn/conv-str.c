@@ -13,8 +13,8 @@
 
 static void d3_fill(const uchar *dec3, uint **dig32, int *ptr)
 {
-	uint b10 = htole32(_tt_apn_from_d3(dec3));
-	**dig32 |= (b10 << *ptr);
+	uint bit10 = _tt_apn_from_d3(dec3);
+	**dig32 |= (bit10 << *ptr);
 	*ptr += 11;
 	if (*ptr > 32) {
 		*ptr = 0;
@@ -80,7 +80,7 @@ static int parse_coef(struct tt_apn *apn, const char *s, int len, int *adjexp,
 			srnd++;
 		tt_assert(*ssig >= '0' && *ssig <= '9' &&
 				*srnd >= '0' && *ssig <= '9');
-		*adjrnd = tt_round((*ssig - '0') & 1, *srnd - '0', 0);
+		*adjrnd = _tt_round((*ssig - '0') & 1, *srnd - '0', 0);
 	}
 
 	/* Conversion: digits in [s, s2], may contain one point */
@@ -204,7 +204,7 @@ int tt_apn_to_string(const struct tt_apn *apn, char *str, uint len)
 			ptpos = 1;
 		}
 		len2 += 2;		/* "E+", "E-" */
-		len2 += _tt_digits(llabs(adjexp));
+		len2 += _tt_digits_ll(llabs(adjexp));
 	} else if (apn->_exp < 0) {
 		note = 1;	/* 0.0abcd, ab.cd (|exp| digits after ".") */
 		len2++;		/* "." */
@@ -252,7 +252,7 @@ int tt_apn_to_string(const struct tt_apn *apn, char *str, uint len)
 
 		/* Change to 3 decimals */
 		uchar dec3[3];
-		_tt_apn_to_d3(le32toh(bit10), dec3);
+		_tt_apn_to_d3(bit10, dec3);
 		if (first) {
 			/* Skip leading 0 */
 			if (dec3[2]) {
