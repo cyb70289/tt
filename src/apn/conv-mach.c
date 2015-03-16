@@ -11,14 +11,15 @@
 #include <string.h>
 #include <math.h>
 
+static const long double _exp10[] = {
+	1E1L, 1E2L, 1E4L, 1E8L, 1E16L, 1E32L, 1E64L, 1E128L, 1E256L
+};
+
 /* Convert num(>0) to [10^18, 10^19), return adjusted exponent.
  * Based on uClibc-0.9.33 source: libc/stdio/_fpmaxtostr.c
  */
 static int norm_fp_to_i64(double num, uint64_t *ui64)
 {
-	static const long double _exp10[] = {
-		1E1L, 1E2L, 1E4L, 1E8L, 1E16L, 1E32L, 1E64L, 1E128L, 1E256L
-	};
 	static const long double _lower = 1E18L, _upper = 1E19L;
 
 	long double lnum = num;
@@ -140,3 +141,144 @@ int tt_apn_from_float(struct tt_apn *apn, double num)
 
 	return 0;
 }
+
+#ifdef __STDC_IEC_559__
+/* IEEE-754 double precision number representation
+ *
+ * Layout(little endian):
+ * +-------+----------------+
+ * |  Bit  | Representation |
+ * +-------+----------------+
+ * |  63   |      Sign      |
+ * +-------+----------------+
+ * | 62~52 |    Exponent    |
+ * +-------+----------------+
+ * | 51~0  |    Mantissa    |
+ * +-------+----------------+
+ *
+ * Value:
+ * +---+--------+---------+---------------------------+
+ * | S |    E   |    M    |           Value           |
+ * +---+--------+---------+---------------------------+
+ * | - | 1~2046 |    -    | (-1)^S * 2^(E-1023) * 1.M |
+ * +---+--------+---------+---------------------------+
+ * | - |   0    | nonzero | (-1)^S * 2^(-1022) * 0.M  |
+ * +---+--------+---------+---------------------------+
+ * | 0 |   0    |    0    |            +0.0           |
+ * +---+--------+---------+---------------------------+
+ * | 1 |   0    |    0    |            -0.0           |
+ * +---+--------+---------+---------------------------+
+ * | 0 |  2047  |    0    |            +Inf           |
+ * +---+--------+---------+---------------------------+
+ * | 1 |  2047  |    0    |            -Inf           |
+ * +---+--------+---------+---------------------------+
+ * | - |  2047  | nonzero |            NaN            |
+ * +---+--------+---------+---------------------------+
+ */
+int tt_apn_to_float(const struct tt_apn *apn, double *num)
+{
+	int ret = 0;
+	union {
+		uint64_t i;
+		double d;
+	} v;
+	struct tt_apn *apn_mm = NULL;
+
+	/* Check zero */
+	if (_tt_apn_is_zero(apn)) {
+		v.i = 0;
+		goto out;
+	}
+
+	/* Check NaN, Inf */
+	if (apn->_inf_nan == TT_APN_INF) {
+		v.i = 2047ULL << 52;    /* Inf */
+		ret = TT_APN_EOVERFLOW;
+		goto out;
+	} else if (apn->_inf_nan == TT_APN_NAN) {
+		v.i = (2047ULL << 52) | ((1ULL << 52) - 1);
+		ret = TT_APN_EINVAL;
+		goto out;
+	}
+
+	apn_mm = tt_apn_alloc(0);
+
+	/* Check overflow */
+	v.i = (2046ULL << 52) | ((1ULL << 52) - 1);	/* Max double */
+	tt_apn_from_float(apn_mm, v.d);
+	if (tt_apn_cmp_abs(apn, apn_mm) >= 0) {
+		v.i = 2047ULL << 52;	/* Inf */
+		ret = TT_APN_EOVERFLOW;
+		tt_warn("Float overflow");
+		goto out;
+	}
+
+	/* Check underflow
+	 * XXX: Unnormalized double can handle 4.94E-324.
+	 * But it causes underrun in the div loop.
+	 * We restrict to normalized double with 2.22E-308.
+	 */
+	v.i = 1ULL << 52;
+	if (tt_apn_cmp_abs(apn_mm, apn) >= 0) {
+		v.i = 0;
+		ret = TT_APN_EUNDERFLOW;
+		tt_warn("Float underflow");
+		goto out;
+	}
+
+	/* Round to 19 significands */
+	int sfr = 0, rnd = 0;
+	if (apn->_msb > 19) {
+		sfr = apn->_msb - 19;
+		rnd = _tt_round(_tt_apn_get_dig(apn->_dig32, sfr) & 1,
+					_tt_apn_get_dig(apn->_dig32, sfr-1),
+					TT_ROUND_HALF_AWAY0);
+	}
+
+	/* Calculate significand */
+	v.d = 0;
+	for (int i = apn->_msb - 1; i >= sfr; i--) {
+		/* We can do much better here. Is it necessary? */
+		v.d *= 10;
+		v.d += _tt_apn_get_dig(apn->_dig32, i);
+	}
+	v.d += rnd;	/* May cause overflow? */
+
+	/* Multiply/divide exponent */
+	int _exp = apn->_exp + sfr;
+	int i = ARRAY_SIZE(_exp10) - 1;	/* _exp = 10^(2^i) */
+	if (_exp > 0) {
+		long double ld = v.d;
+		while (_exp > 0) {
+			if (_exp >= 1U << i) {
+				ld *= _exp10[i];
+				_exp -= 1U << i;
+			}
+			i--;
+		}
+		v.d = ld;
+	} else if (_exp < 0) {
+		_exp = -_exp;
+		long double ld = v.d;
+		while (_exp > 0) {
+			if (_exp >= 1U << i) {
+				ld /= _exp10[i];
+				_exp -= 1U << i;
+			}
+			i--;
+		}
+		v.d = ld;
+	}
+
+out:
+	if (apn_mm)
+		tt_apn_free(apn_mm);
+
+	/* Check sign */
+	if (apn->_sign)
+		v.i |= 1ULL << 63;
+
+	*num = v.d;
+	return ret;
+}
+#endif

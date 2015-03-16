@@ -13,7 +13,7 @@ int _tt_apn_round_adj(struct tt_apn *apn);
 /* Check if APN == 0 */
 static inline bool _tt_apn_is_zero(const struct tt_apn *apn)
 {
-	return apn->_msb == 1 && *apn->_dig32 == 0;
+	return apn->_msb == 1 && *apn->_dig32 == 0 && !apn->_inf_nan;
 }
 
 /* Check sanity */
@@ -40,3 +40,6 @@ static inline void _tt_apn_to_d3_cp(uint bit10, uchar *dec3)
 	dec3[1] = d3[1];
 	dec3[2] = d3[2];
 }
+
+/* Get digit at pos (based 0) */
+uchar _tt_apn_get_dig(uint *dig, int pos);

@@ -119,3 +119,18 @@ int _tt_apn_sanity(const struct tt_apn *apn)
 
 	return 0;
 }
+
+/* Get digit at pos
+ * - pos starts from 0
+ */
+uchar _tt_apn_get_dig(uint *dig, int pos)
+{
+	uint dig32 = dig[pos / 9];
+	pos %= 9;
+	int shf = pos / 3;
+	shf *= 11;
+
+	const uchar *d = _tt_apn_to_d3((dig32 >> shf) & 0x3FF);
+
+	return d[pos % 3];
+}

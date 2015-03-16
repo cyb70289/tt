@@ -294,21 +294,6 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 	return msb;
 }
 
-/* Get digit at pos
- * - pos starts from 0
- */
-static uchar get_dig(uint *dig, int pos)
-{
-	uint dig32 = dig[pos / 9];
-	pos %= 9;
-	int shf = pos / 3;
-	shf *= 11;
-
-	const uchar *d = _tt_apn_to_d3((dig32 >> shf) & 0x3FF);
-
-	return d[pos % 3];
-}
-
 /* Add significands
  * - dst won't overlap with src1 and src2
  * - exp_adj1 >= exp_adj2, exp_adj2 <= 0
@@ -363,8 +348,8 @@ static int add_sig(struct tt_apn *dst, const struct tt_apn *src1, int exp_adj1,
 
 	/* Check rounding */
 	if (adj_adj) {
-		if (_tt_round(get_dig(dst->_dig32, adj_adj) & 1,
-					get_dig(dst->_dig32, adj_adj-1), 0)) {
+		if (_tt_round(_tt_apn_get_dig(dst->_dig32, adj_adj) & 1,
+				_tt_apn_get_dig(dst->_dig32, adj_adj-1), 0)) {
 			uint one = 1;
 			msb = add_digs(dst->_dig32, msb, &one, 1);
 		}
@@ -424,7 +409,7 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 		dst->_inf_nan = TT_APN_INF;
 		dst->_sign = (src1->_inf_nan == TT_APN_INF ?
 			src1->_sign : src2->_sign);
-		return dst->_sign ? TT_APN_EOVERFLOW : TT_APN_EUNDERFLOW;
+		return TT_APN_EOVERFLOW;
 	}
 
 	/* Allocate a new APN if dst and src overlaps */

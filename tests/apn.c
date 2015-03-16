@@ -24,10 +24,23 @@ int main(void)
 	tt_apn_to_string(apn, s, 100);
 	printf("str: %s\n", s);
 
-	double dv = -123456789012345678901234567890.;
+	double dv = -123456789012345678901234567890E279;
+	dv /= 10;
 	tt_apn_from_float(apn, dv);
 	tt_apn_to_string(apn, s, 100);
-	printf("float: %s <--> %.18E\n", s, dv);
+	double dv2 = 0;
+	tt_apn_to_float(apn, &dv2);
+	printf("float: %.18E --> %s --> %.18E\n", dv, s, dv2);
+
+	uint64_t dmax;
+	dmax = (2046ULL << 52) | ((1ULL << 52) - 1);	/* Max double */
+	tt_apn_from_float(apn, *(double *)&dmax);
+	tt_apn_to_string(apn, s, 100);
+	printf("max double: %s\n", s);
+	dmax = 1;
+	tt_apn_from_float(apn, *(double *)&dmax);
+	tt_apn_to_string(apn, s, 100);
+	printf("min double: %s\n", s);
 
 	struct tt_apn *apn2 = tt_apn_alloc(100);
 	tt_apn_from_string(apn2, "1E-40");
