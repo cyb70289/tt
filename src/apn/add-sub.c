@@ -192,9 +192,7 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 		/* Align-3 */
 		if (adj3) {	/* adj3 = 1, 2 */
 			/* Check 3-digit sets in first uint */
-			int u1_dig3 = msb % 9;
-			if (u1_dig3 == 0)
-				u1_dig3 = 9;
+			int u1_dig3 = (msb - 1) % 9 + 1;
 			u1_dig3 += 2;
 			u1_dig3 /= 3;	/* 1, 2, 3 */
 			if ((u1_dig3 + adj3) > 3)
@@ -216,9 +214,7 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 		/* Unaligned */
 		if (adj) {	/* adj = 1, 2 */
 			/* Check digits in first uint */
-			int u1_dig = msb % 9;
-			if (u1_dig == 0)
-				u1_dig = 9;
+			int u1_dig = (msb - 1) % 9 + 1;
 			if ((u1_dig + adj) > 9)
 				uints++;
 			msb += adj;
@@ -262,9 +258,7 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 			cur = dst;
 
 			/* Check 3-digit sets in first uint */
-			int u1_dig3 = msb % 9;
-			if (u1_dig3 == 0)
-				u1_dig3 = 9;
+			int u1_dig3 = (msb - 1) % 9 + 1;
 			u1_dig3 += 2;
 			u1_dig3 /= 3;	/* 1, 2, 3 */
 			if (u1_dig3 <= adj3)
@@ -289,9 +283,7 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 			dst[uints-1] = rshift_dig12(cur[uints-1], adj);
 
 			/* Check digits in first uint */
-			int u1_dig = msb % 9;
-			if (u1_dig == 0)
-				u1_dig = 9;
+			int u1_dig = (msb - 1) % 9 + 1;
 			if (u1_dig <= adj)
 				uints--;
 			msb -= adj;

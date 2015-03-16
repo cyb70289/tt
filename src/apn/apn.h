@@ -4,11 +4,20 @@
  */
 #pragma once
 
-/* Clear zero */
+/* Clear to zero */
 void _tt_apn_zero(struct tt_apn *apn);
 
 /* Increase abs of significand */
 int _tt_apn_round_adj(struct tt_apn *apn);
+
+/* Check if APN == 0 */
+static inline bool _tt_apn_is_zero(const struct tt_apn *apn)
+{
+	return apn->_msb == 1 && *apn->_dig32 == 0;
+}
+
+/* Check sanity */
+int _tt_apn_sanity(const struct tt_apn *apn);
 
 /* 3 decimals to 10 bits */
 static inline uint _tt_apn_from_d3(const uchar *dec3)

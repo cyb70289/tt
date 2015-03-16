@@ -24,3 +24,4 @@
 #define TT_APN_EDIV_0		-204
 #define TT_APN_EDIV_UNDEF	-205	/* 0 / 0 */
 #define TT_APN_EINVAL		-206	/* log(-1), operate NaN, ... */
+#define TT_APN_ESANITY		-207	/* APN sanity checking failed */

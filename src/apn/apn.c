@@ -4,7 +4,7 @@
  */
 #include <tt/tt.h>
 #include <tt/apn/apn.h>
-#include <common/atomic.h>
+#include <common/lib.h>
 #include "apn.h"
 
 #include <string.h>
@@ -85,4 +85,37 @@ int _tt_apn_round_adj(struct tt_apn *apn)
 	};
 
 	return tt_apn_add(apn, apn, &apn_1);
+}
+
+/* Check sanity */
+int _tt_apn_sanity(const struct tt_apn *apn)
+{
+	if (apn->_msb <= 0 || apn->_msb > apn->_prec)
+		return TT_APN_ESANITY;
+
+	int i, last_dig_idx = (apn->_msb + 8) / 9 - 1;
+
+	/* Check carry guard bits */
+	for (i = 0; i <= last_dig_idx; i++)
+		if ((apn->_dig32[i] & (BIT(10) | BIT(21))))
+			return TT_APN_ESANITY;
+
+	/* Check remaining uints */
+	for (; i < apn->_digsz / 4; i++)
+		if (apn->_dig32[i])
+			return TT_APN_ESANITY;
+
+	/* Check last valid uint */
+	int last_dig_cnt = (apn->_msb - 1) % 9 + 1;
+        uchar d[9];
+	_tt_apn_to_d3_cp(apn->_dig32[last_dig_idx] & 0x3FF, d);
+	_tt_apn_to_d3_cp((apn->_dig32[last_dig_idx] >> 11) & 0x3FF, d+3);
+	_tt_apn_to_d3_cp(apn->_dig32[last_dig_idx] >> 22, d+6);
+	for (i = 8; i > last_dig_cnt - 1; i--)
+		if (d[i])
+			return TT_APN_ESANITY;
+	if (d[i] == 0 && i != 0)	/* Don't blame on "0" */
+		return TT_APN_ESANITY;
+
+	return 0;
 }

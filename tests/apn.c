@@ -4,6 +4,7 @@
  */
 #include <tt/tt.h>
 #include <tt/apn/apn.h>
+#include <apn/apn.h>
 
 int main(void)
 {
@@ -35,6 +36,8 @@ int main(void)
 	tt_apn_add(apn2, apn2, apn3);
 	tt_apn_to_string(apn2, s, 120);
 	printf("add: %s\n", s);
+	if (_tt_apn_sanity(apn2))
+		tt_error("APN sanity error!");
 
 	const char *sci[] = {
 #if 0
