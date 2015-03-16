@@ -100,12 +100,12 @@ static int add_digs(uint *dig, const int msb, const uint *dig2, const int msb2)
  * - adj = 1, 2
  * - return shifted value
  */
-static uint lshift_digs12(uint dig32, int adj)
+static uint lshift_dig12(uint dig32, int adj)
 {
 	uchar d[9];
-	_tt_apn_to_d3(dig32 & 0x3FF, d);
-	_tt_apn_to_d3((dig32 >> 11) & 0x3FF, d+3);
-	_tt_apn_to_d3(dig32 >> 22, d+6);
+	_tt_apn_to_d3_cp(dig32 & 0x3FF, d);
+	_tt_apn_to_d3_cp((dig32 >> 11) & 0x3FF, d+3);
+	_tt_apn_to_d3_cp(dig32 >> 22, d+6);
 
 	int i;
 	for (i = 8; i >= adj; i--)
@@ -121,12 +121,12 @@ static uint lshift_digs12(uint dig32, int adj)
  * - adj = 1, 2
  * - retrun shifted value
  */
-static uint rshift_digs12(uint dig32, int adj)
+static uint rshift_dig12(uint dig32, int adj)
 {
 	uchar d[9];
-	_tt_apn_to_d3(dig32 & 0x3FF, d);
-	_tt_apn_to_d3((dig32 >> 11) & 0x3FF, d+3);
-	_tt_apn_to_d3(dig32 >> 22, d+6);
+	_tt_apn_to_d3_cp(dig32 & 0x3FF, d);
+	_tt_apn_to_d3_cp((dig32 >> 11) & 0x3FF, d+3);
+	_tt_apn_to_d3_cp(dig32 >> 22, d+6);
 
 	int i;
 	for (i = 0; i < 9-adj; i++)
@@ -224,17 +224,16 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 			msb += adj;
 
 			/* Shift left */
-			uchar d[3];
 			for (i = uints-1; i > 0; i--) {
-				dst[i] = lshift_digs12(cur[i], adj);
+				dst[i] = lshift_dig12(cur[i], adj);
 				/* Append msb of lower uint */
-				_tt_apn_to_d3(cur[i-1] >> 22, d);
+				const uchar *d = _tt_apn_to_d3(cur[i-1] >> 22);
 				if (adj == 1)
 					dst[i] += d[2];
 				else
 					dst[i] += (d[2] * 10 + d[1]);
 			}
-			dst[0] = lshift_digs12(cur[0], adj);
+			dst[0] = lshift_dig12(cur[0], adj);
 		}
 	} else { /* Right shift */
 		/* Align-9 */
@@ -276,11 +275,10 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 		/* Unaligned */
 		if (adj) {	/* adj = 1, 2 */
 			/* Shift right */
-			uchar d[3];
 			for (i = 0; i < uints - 1; i++) {
-				dst[i] = rshift_digs12(cur[i], adj);
+				dst[i] = rshift_dig12(cur[i], adj);
 				/* Prepend lsb of higher uint */
-				_tt_apn_to_d3(cur[i+1] & 0x3FF, d);
+				const uchar *d = _tt_apn_to_d3(cur[i+1] & 0x3FF);
 				uint a;
 				if (adj == 1)
 					a = ((uint)d[0]) * 100;
@@ -288,7 +286,7 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 					a = ((uint)d[1]) * 100 + d[0] * 10;
 				dst[i] += a << 22;
 			}
-			dst[uints-1] = rshift_digs12(cur[uints-1], adj);
+			dst[uints-1] = rshift_dig12(cur[uints-1], adj);
 
 			/* Check digits in first uint */
 			int u1_dig = msb % 9;
@@ -314,8 +312,7 @@ static uchar get_dig(uint *dig, int pos)
 	int shf = pos / 3;
 	shf *= 11;
 
-	uchar d[3];
-	_tt_apn_to_d3((dig32 >> shf) & 0x3FF, d);
+	const uchar *d = _tt_apn_to_d3((dig32 >> shf) & 0x3FF);
 
 	return d[pos % 3];
 }

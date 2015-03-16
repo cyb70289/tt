@@ -67,31 +67,6 @@ void _tt_apn_zero(struct tt_apn *apn)
 	memset(apn->_dig32, 0, apn->_digsz);
 }
 
-/* 3 decimals to 10 bits */
-uint _tt_apn_from_d3(const uchar *dec3)
-{
-	uint bit10 = 0;
-
-	for (int i = 2; i >= 0; i--) {
-		bit10 *= 10;
-		bit10 += dec3[i];
-	}
-	tt_assert_fa(bit10 < 1000);
-
-	return bit10;
-}
-
-/* 10 bits --> 3 decimals */
-void _tt_apn_to_d3(uint bit10, uchar *dec3)
-{
-	tt_assert_fa(bit10 < 1000);
-
-	dec3[2] = bit10 / 100;
-	bit10 %= 100;
-	dec3[1] = bit10 / 10;
-	dec3[0] = bit10 % 10;
-}
-
 /* Increase |significand|
  * apn += { apn->_sign, 1, apn->_exp }
  */

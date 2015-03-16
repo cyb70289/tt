@@ -251,8 +251,7 @@ int tt_apn_to_string(const struct tt_apn *apn, char *str, uint len)
 		}
 
 		/* Change to 3 decimals */
-		uchar dec3[3];
-		_tt_apn_to_d3(bit10, dec3);
+		const uchar *dec3 = _tt_apn_to_d3(bit10);
 		if (first) {
 			/* Skip leading 0 */
 			if (dec3[2]) {
