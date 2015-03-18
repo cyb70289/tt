@@ -131,12 +131,13 @@ int tt_apn_from_float(struct tt_apn *apn, double num)
 	if (sign)
 		num = -num;
 
-	/* Convert to [10^18, 10^19). 19 significands are more than enough for
-	 * a double float number, whose precision is less than 17 decimals. */
+	/* Convert to [10^18, 10^19). 19 significands is enough to keep
+	 * precision of a double float number.
+	 */
 	uint64_t ui64;
 	int adjexp = norm_fp_to_i64(num, &ui64);
 	tt_apn_from_uint(apn, ui64);
-	apn->_exp += adjexp;
+	apn->_exp = adjexp;
 	apn->_sign = sign;
 
 	return 0;
@@ -216,7 +217,7 @@ int tt_apn_to_float(const struct tt_apn *apn, double *num)
 	/* Check underflow
 	 * XXX: Unnormalized double can handle 4.94E-324.
 	 * But it causes underrun in the div loop.
-	 * We restrict to normalized double with 2.22E-308.
+	 * We restrict to normalized double bounded to 2.22E-308.
 	 */
 	v.i = 1ULL << 52;
 	if (tt_apn_cmp_abs(apn_mm, apn) >= 0) {
@@ -236,19 +237,18 @@ int tt_apn_to_float(const struct tt_apn *apn, double *num)
 	}
 
 	/* Calculate significand */
-	v.d = 0;
+	long double ld = 0;
 	for (int i = apn->_msb - 1; i >= sfr; i--) {
 		/* We can do much better here. Is it necessary? */
-		v.d *= 10;
-		v.d += _tt_apn_get_dig(apn->_dig32, i);
+		ld *= 10;
+		ld += _tt_apn_get_dig(apn->_dig32, i);
 	}
-	v.d += rnd;	/* May cause overflow? */
+	ld += rnd;	/* May cause overflow? */
 
 	/* Multiply/divide exponent */
 	int _exp = apn->_exp + sfr;
 	int i = ARRAY_SIZE(_exp10) - 1;	/* _exp = 10^(2^i) */
 	if (_exp > 0) {
-		long double ld = v.d;
 		while (_exp > 0) {
 			if (_exp >= 1U << i) {
 				ld *= _exp10[i];
@@ -256,10 +256,8 @@ int tt_apn_to_float(const struct tt_apn *apn, double *num)
 			}
 			i--;
 		}
-		v.d = ld;
 	} else if (_exp < 0) {
 		_exp = -_exp;
-		long double ld = v.d;
 		while (_exp > 0) {
 			if (_exp >= 1U << i) {
 				ld /= _exp10[i];
@@ -267,8 +265,8 @@ int tt_apn_to_float(const struct tt_apn *apn, double *num)
 			}
 			i--;
 		}
-		v.d = ld;
 	}
+	v.d = ld;
 
 out:
 	if (apn_mm)

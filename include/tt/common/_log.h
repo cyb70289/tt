@@ -28,7 +28,7 @@ enum {
 };
 
 void tt_log_set_target(int target);
-void tt_log_set_level(int level);
+int tt_log_set_level(int level);
 
 void tt_log_set_fd(int fd);
 

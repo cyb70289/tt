@@ -117,20 +117,24 @@ int _tt_apn_sanity(const struct tt_apn *apn)
 	if (d[i] == 0 && i != 0)	/* Don't blame on "0" */
 		return TT_APN_ESANITY;
 
+	/* Check zero */
+	if (_tt_apn_is_zero(apn) && apn->_exp > 0)
+		return TT_APN_ESANITY;
+
 	return 0;
 }
 
-/* Get digit at pos
+/* Get "pos-th" digit (0~9)
  * - pos starts from 0
  */
-uchar _tt_apn_get_dig(uint *dig, int pos)
+uint _tt_apn_get_dig(const uint *dig, int pos)
 {
 	uint dig32 = dig[pos / 9];
 	pos %= 9;
-	int shf = pos / 3;
-	shf *= 11;
+	int sft = pos / 3;
+	sft *= 11;
 
-	const uchar *d = _tt_apn_to_d3((dig32 >> shf) & 0x3FF);
+	const uchar *d = _tt_apn_to_d3((dig32 >> sft) & 0x3FF);
 
 	return d[pos % 3];
 }

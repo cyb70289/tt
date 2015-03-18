@@ -69,14 +69,14 @@ static int add_digs(uint *dig, const int msb, const uint *dig2, const int msb2)
 			i = uints;
 			break;
 		}
-		dig[i] = add_dig(dig[i], 1, &carry);
+		dig[i] = add_dig(dig[i], 0, &carry);
 	}
 
 	/* Check new MSB */
 	if (carry) {
 		/* Carry at uint boundary */
 		dig[i] = 1;
-		return msb + 1;
+		return _tt_max(msb, msb2) + 1;
 	} else {
 		/* i => valid uints */
 		tt_assert_fa(i > 0);
@@ -156,9 +156,11 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 	int append0;
 	if (adj < 0) {
 		adj = -adj;
-		if (adj > msb) {
-			adj = msb;
-			msb_r = 0;
+		if (adj >= msb) {
+			/* All digits truncated, just fill with 0 */
+			if (dst == src)
+				memset(dst, 0, uints * 4);
+			return 1;
 		}
 		append0 = 0;	/* Truncate */
 	} else if (adj > 0) {
@@ -294,80 +296,6 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 	return msb;
 }
 
-/* Add significands
- * - dst won't overlap with src1 and src2
- * - exp_adj1 >= exp_adj2, exp_adj2 <= 0
- * - significand needs to shift exp_adj digits(+:left; -:right)
- * - return: 0, TT_APN_EROUNDED
- */
-static int add_sig(struct tt_apn *dst, const struct tt_apn *src1, int exp_adj1,
-		const struct tt_apn *src2, int exp_adj2)
-{
-	tt_assert_fa(exp_adj1 >= exp_adj2 && exp_adj2 <= 0);
-
-	dst->_exp = src1->_exp - exp_adj1;
-	tt_assert_fa(dst->_exp == src2->_exp - exp_adj2);
-
-	int ret = 0, adj_adj = 0, i;
-
-	/* Use rounding guard digits to gain precision */
-	if (exp_adj2 < 0) {
-		int guard_adj = -exp_adj2;
-		if (guard_adj > TT_APN_PREC_RND)
-			guard_adj = TT_APN_PREC_RND;
-		exp_adj1 += guard_adj;
-		exp_adj2 += guard_adj;
-		adj_adj += guard_adj;
-		ret = TT_APN_EROUNDED;
-	}
-
-	/* If both operands need shift, make src1 align-9 shifting */
-	if ((exp_adj1 % 9) && (exp_adj2 % 9)) {
-		int align_adj = 9 - exp_adj1 % 9;
-		if (align_adj > 9)	/* exp_adj may be negative */
-			align_adj -= 9;
-		exp_adj1 += align_adj;
-		exp_adj2 += align_adj;
-		adj_adj += align_adj;
-	}
-
-	/* Copy adjusted significand of src1 to dst */
-	tt_assert_fa(dst->_prec_full > (src1->_msb + exp_adj1));
-	shift_digs(dst->_dig32, src1->_dig32, src1->_msb, exp_adj1);
-
-	/* Copy adjusted significand of src2 to temporary buffer */
-	uint *tmpdig = _tt_get_buf(dst->_digsz);
-	memset(tmpdig, 0, dst->_digsz);
-	tt_assert_fa(dst->_prec_full > (src2->_msb + exp_adj2));
-	shift_digs(tmpdig, src2->_dig32, src2->_msb, exp_adj2);
-
-	/* Aligned add */
-	int msb = add_digs(dst->_dig32, src1->_msb + exp_adj1,
-			tmpdig, src2->_msb + exp_adj2);
-	_tt_put_buf(tmpdig);
-
-	/* Check rounding */
-	if (adj_adj) {
-		if (_tt_round(_tt_apn_get_dig(dst->_dig32, adj_adj) & 1,
-				_tt_apn_get_dig(dst->_dig32, adj_adj-1), 0)) {
-			uint one = 1;
-			msb = add_digs(dst->_dig32, msb, &one, 1);
-		}
-	}
-
-	/* Adjust significand, msb */
-	dst->_msb = msb - adj_adj;
-	if (dst->_msb > dst->_prec) {
-		adj_adj++;
-		dst->_msb--;
-		dst->_exp++;	/* TODO: xflow */
-		ret = TT_APN_EROUNDED;
-	}
-	shift_digs(dst->_dig32, dst->_dig32, msb, -adj_adj);
-
-	return ret;
-}
-
 /* Sub significands
  * - dst won't overlap with src1 and src2
  * - exp_adj1 >= exp_adj2, exp_adj2 <= 0
@@ -424,7 +352,7 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 
 	/* Check exponent alignment.
 	 * Swap src1 and src2 if exponent of src1 is smaller, and make src1
-	 * the one needs to adjust exponent.
+	 * the one needs to adjust exponent(left shift signifcands).
 	 */
 	int exp_adj1 = src1->_exp - src2->_exp, exp_adj2 = 0;
 	if (exp_adj1 < 0) {
@@ -433,20 +361,92 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 	}
 
 	/* Check rounding */
-	int exp_dst = src1->_msb + exp_adj1;
-	if (exp_dst > dst2->_prec) {
-		exp_dst -= dst2->_prec;
-		exp_adj1 -= exp_dst;
-		exp_adj2 -= exp_dst;
+	int msb_dst = src1->_msb;
+	/* Shifting "0" can't influence precision */
+	if (!_tt_apn_is_zero(src1))
+		msb_dst += exp_adj1;
+	if (msb_dst < src2->_msb)
+		msb_dst = src2->_msb;
+	if (msb_dst > dst2->_prec) {
+		int adj_adj = msb_dst - dst2->_prec;
+		exp_adj1 -= adj_adj;
+		exp_adj2 -= adj_adj;
 	}
+	if ((exp_adj1 < 0 && !_tt_apn_is_true_zero(src1)) ||
+			(exp_adj2 < 0 && !_tt_apn_is_true_zero(src2)))
+		ret = TT_APN_EROUNDED;
+
+	/* Set result exponent, may adjust later */
+	dst2->_exp = src1->_exp - exp_adj1;
+
+	/* Use rounding guard digits to gain precision */
+	int adj_adj = 0;
+	if (exp_adj2 < 0) {
+		int guard_adj = -exp_adj2;
+		if (guard_adj > TT_APN_PREC_RND)
+			guard_adj = TT_APN_PREC_RND;
+		if (-(exp_adj2 + guard_adj) < src2->_msb) {
+			exp_adj1 += guard_adj;
+			exp_adj2 += guard_adj;
+			adj_adj += guard_adj;
+		}
+	}
+
+	/* If both operands need shift, make src1 align-9 shifting */
+	if ((exp_adj1 % 9) && (exp_adj2 % 9)) {
+		int align_adj = 9 - exp_adj1 % 9;
+		if (align_adj > 9)	/* exp_adj may be negative */
+			align_adj -= 9;
+		exp_adj1 += align_adj;
+		exp_adj2 += align_adj;
+		adj_adj += align_adj;
+	}
+
+	/* "0" needn't shift */
+	if (_tt_apn_is_zero(src1))
+		exp_adj1 = 0;
+	if (_tt_apn_is_zero(src2))
+		exp_adj2 = 0;
+
+	/* Copy adjusted significand of src1 to dst */
+	tt_assert_fa(dst2->_prec_full > (src1->_msb + exp_adj1));
+	shift_digs(dst2->_dig32, src1->_dig32, src1->_msb, exp_adj1);
+
+	/* Copy adjusted significand of src2 to temporary buffer */
+	uint *tmpdig = _tt_get_buf(dst2->_digsz);
+	memset(tmpdig, 0, dst2->_digsz);
+	tt_assert_fa(dst2->_prec_full > (src2->_msb + exp_adj2));
+	shift_digs(tmpdig, src2->_dig32, src2->_msb, exp_adj2);
 
 	/* - Compare sign, decide to do "+" or "-"
 	 * - Compare adjusted signficand abs value, and decide the order of "-"
 	 */
 	if (src1->_sign == src2->_sign) {
+		/* Adding... */
 		dst2->_sign = src1->_sign;
-		ret = add_sig(dst2, src1, exp_adj1, src2, exp_adj2);
+		/* Add aligned significands */
+		int msb = add_digs(dst2->_dig32, src1->_msb + exp_adj1,
+				tmpdig, src2->_msb + exp_adj2);
+		/* Check rounding */
+		if (adj_adj) {
+			if (_tt_round(_tt_apn_get_dig(dst2->_dig32, adj_adj) & 1,
+					_tt_apn_get_dig(dst2->_dig32, adj_adj-1), 0)) {
+				uint one = 1;
+				msb = add_digs(dst2->_dig32, msb, &one, 1);
+			}
+		}
+		/* Adjust significand, msb */
+		dst2->_msb = msb - adj_adj;
+		tt_assert_fa(dst2->_msb >= 1 && dst2->_msb <= (dst2->_prec+1));
+		if (dst2->_msb > dst2->_prec) {
+			adj_adj++;
+			dst2->_msb--;
+			dst2->_exp++;	/* TODO: xflow */
+			ret = TT_APN_EROUNDED;
+		}
+		shift_digs(dst2->_dig32, dst2->_dig32, msb, -adj_adj);
 	} else {
+		/* Substracting... */
 		int cmp12 = cmp_sig(src1, exp_adj1, src2, exp_adj2);
 		if (cmp12 >= 0) {
 			dst2->_sign = src1->_sign;
@@ -456,6 +456,8 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 			ret = sub_sig(dst2, src2, exp_adj2, src1, exp_adj1);
 		}
 	}
+
+	_tt_put_buf(tmpdig);
 
 	/* Copy to dst if overlap with src */
 	if (dst2 != dst) {

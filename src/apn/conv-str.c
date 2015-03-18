@@ -158,6 +158,10 @@ int tt_apn_from_string(struct tt_apn *apn, const char *str)
 	if (adjrnd)
 		_tt_apn_round_adj(apn);
 
+	/* Check zero */
+	if (_tt_apn_is_zero(apn) && apn->_exp > 0)
+		apn->_exp = 0;
+
 	return ret;
 
 invalid:

@@ -10,10 +10,15 @@ void _tt_apn_zero(struct tt_apn *apn);
 /* Increase abs of significand */
 int _tt_apn_round_adj(struct tt_apn *apn);
 
-/* Check if APN == 0 */
+/* Check if significand == 0, it's not a true zero if _exp < 0 */
 static inline bool _tt_apn_is_zero(const struct tt_apn *apn)
 {
 	return apn->_msb == 1 && *apn->_dig32 == 0 && !apn->_inf_nan;
+}
+
+static inline bool _tt_apn_is_true_zero(const struct tt_apn *apn)
+{
+	return _tt_apn_is_zero(apn) && apn->_exp == 0;
 }
 
 /* Check sanity */
@@ -41,5 +46,5 @@ static inline void _tt_apn_to_d3_cp(uint bit10, uchar *dec3)
 	dec3[2] = d3[2];
 }
 
-/* Get digit at pos (based 0) */
-uchar _tt_apn_get_dig(uint *dig, int pos);
+/* Get "pos-th" digit (pos starts from 0) */
+uint _tt_apn_get_dig(const uint *dig, int pos);

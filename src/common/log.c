@@ -24,11 +24,14 @@ void tt_log_set_target(int target)
 	__target = target;
 }
 
-void tt_log_set_level(int level)
+int tt_log_set_level(int level)
 {
 	tt_assert(level >= 0 && level < TT_LOG_MAX);
 
+	int old_level = __level;
 	__level = level;
+
+	return old_level;
 }
 
 void tt_log_set_fd(int fd)
@@ -54,8 +57,9 @@ void tt_log(int level, const char *func, const char *format, ...)
 	va_list ap;
 	va_start(ap, format);
 
-	char msg[256];
-	vsnprintf(msg, 256, format, ap);
+	char msg[512+12];
+	if (vsnprintf(msg, 512, format, ap) >= 512)
+		snprintf(msg+511, 13, "<Truncated>");
 
 	char meta[32];
 	const char *prefix = "", *suffix = "";

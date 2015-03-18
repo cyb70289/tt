@@ -1,7 +1,6 @@
 - apn compare
-- apn test case
 - buffer management: _tt_get_buf, _tt_put_buf
-- test on big endian machine
+- apn_to_float: long double to double conversion may result to wrong result
 - add makefile config to set arch
 - _tt_is_zero()
 - simd optimization
