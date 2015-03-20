@@ -25,4 +25,7 @@
 #define CONFIG_APN_DIGITS	60		/* 28B */
 #define CONFIG_APN_DIGITS_MAX	100000000	/* 42MB */
 
+/* Memory pool for temporary storage */
+#define CONFIG_POOL_SIZE	(1 << 20)	/* Must be 2^n, >= 4096 */
+
 #endif	/* HAVE_TT_CONFIG_H */

@@ -74,14 +74,14 @@ static inline int tt_list_isempty(const struct tt_list *head)
 }
 
 /* Iterate over a list */
-#define list_for_each(pos, head)	\
+#define tt_list_for_each(pos, head)	\
 	for (pos = (head)->next; pos != (head); pos = pos->next)
 
 /* Iterate over a list in reverse order */
-#define	list_for_each_prev(pos, head)	\
+#define	tt_list_for_each_prev(pos, head)	\
 	for (pos = (head)->prev; pos != (head); pos = pos->prev)
 
 /* Iterate over a list, safe against removal of list entry */
-#define list_for_each_safe(pos, n, head) \
+#define tt_list_for_each_safe(pos, n, head)	\
 	for (pos = (head)->next, n = pos->next; pos != (head);	\
 			pos = n, n = pos->next)

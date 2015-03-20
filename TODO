@@ -1,5 +1,6 @@
+- slab buffer management
+- makefile: LDLIBS should be set with each binary
 - apn compare
-- buffer management: _tt_get_buf, _tt_put_buf
 - apn_to_float: long double to double conversion may result to wrong result
 - add makefile config to set arch
 - _tt_is_zero()

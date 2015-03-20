@@ -104,7 +104,7 @@ void tt_queue_free(struct tt_queue *queue)
 	} else {
 		/* Free the list */
 		struct tt_list *pos, *tmp;
-		list_for_each_safe(pos, tmp, &queue->_head)
+		tt_list_for_each_safe(pos, tmp, &queue->_head)
 			free(pos);
 	}
 

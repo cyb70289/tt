@@ -98,7 +98,7 @@ void tt_stack_free(struct tt_stack *stack)
 	} else {
 		/* Free the list */
 		struct tt_list *pos, *tmp;
-		list_for_each_safe(pos, tmp, &stack->_head)
+		tt_list_for_each_safe(pos, tmp, &stack->_head)
 			free(pos);
 	}
 
