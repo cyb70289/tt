@@ -60,8 +60,11 @@ struct tt_slab *_tt_slab_alloc(const char *name, uint obj_sz, uint obj_cnt)
 	} else if (obj_sz == 0) {
 		return NULL;
 	}
-	if (obj_cnt == 0)
+	if (obj_cnt == 0) {
 		obj_cnt = SLAB_OBJ_DEF_CNT;
+		if (obj_cnt * obj_sz < 4096)
+			obj_cnt = 4096 / obj_sz;
+	}
 	if (obj_sz * obj_cnt > SLAB_BUF_MAX_SZ) {
 		obj_cnt = SLAB_BUF_MAX_SZ / obj_sz;
 		tt_warn("Object count truncated to %d", obj_cnt);
@@ -93,7 +96,7 @@ struct tt_slab *_tt_slab_alloc(const char *name, uint obj_sz, uint obj_cnt)
 		return NULL;
 	}
 
-	tt_info("Slab '%s' created: obj size = %d, obj count = %d",
+	tt_info("Slab '%s' created: size = %d, count = %d",
 			slab->name, slab->obj_sz, slab->obj_cnt);
 	return slab;
 }

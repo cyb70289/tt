@@ -461,9 +461,10 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 
 	/* Copy to dst if overlap with src */
 	if (dst2 != dst) {
-		free(dst->_dig32);
+		_tt_put_buf(dst->_dig32);
 		memcpy(dst, dst2, sizeof(struct tt_apn));
-		free(dst2);
+		void __tt_apn_free2(struct tt_apn *apn);
+		__tt_apn_free2(dst2);
 	}
 
 	if (ret == TT_APN_EROUNDED)
