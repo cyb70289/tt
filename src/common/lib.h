@@ -58,14 +58,8 @@ int _tt_atoi(const char *str, int *i);
 uint _tt_add_uint(uint a, uint b, char *c);
 uint _tt_sub_uint(uint a, uint b, char *c);
 
-/* Buffer management */
-void *_tt_get_buf(size_t sz);
-void _tt_put_buf(void *buf);
-struct tt_slab;
-struct tt_slab *_tt_slab_alloc(const char *name, uint obj_sz, uint obj_cnt);
-void _tt_slab_free(struct tt_slab *slab);
-void *_tt_slab_get_obj(struct tt_slab *slab);
-void _tt_slab_put_obj(struct tt_slab *slab, void *obj);
-
 /* Rounding */
 int _tt_round(int odd, uint dig, int rnd);
+
+/* Memory management */
+#include "mm/mm.h"

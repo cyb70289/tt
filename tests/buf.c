@@ -15,6 +15,7 @@
 #define BLOCK_MAGIC_FREE	0xBABE
 #define BLOCK_MAGIC_ALLOC	0xFACE
 
+#if 0
 struct pool {
 	uint size;
 	uint free;
@@ -255,11 +256,12 @@ static int buddy_test(int n)
 
 	return 0;
 }
+#endif
 
 struct tt_slab {
 	uint magic;		/* Slab tag */
 	char name[16];		/* Slab name */
-	pthread_mutex_t mtx;
+	pthread_spinlock_t spl;
 	uint missed;		/* Failed allocations */
 
 	void *obj_buf;		/* Object buffer */
@@ -432,8 +434,10 @@ int main(void)
 	srand(time(NULL));
 	tt_log_set_level(TT_LOG_INFO);
 
+#if 0
 	if (buddy_test(100) == 0)
 		printf("Buddy test succeeded\n");
+#endif
 
 	if (slab_test(100) == 0)
 		printf("Slab test succeeded\n");

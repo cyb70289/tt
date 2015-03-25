@@ -1,10 +1,12 @@
-/* Random size buffer management - Buddy algorithm
+/* !!DEPRECATED!! It's way slower than malloc.
+ *
+ * Random size buffer management - Buddy algorithm
  *
  * Copyright (C) 2015 Yibo Cai
  */
 #include <tt/tt.h>
 #include <tt/common/list.h>
-#include "lib.h"
+#include "../lib.h"
 
 #include <pthread.h>
 

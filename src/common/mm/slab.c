@@ -4,7 +4,7 @@
  */
 #include <tt/tt.h>
 #include <tt/common/list.h>
-#include "lib.h"
+#include "../lib.h"
 
 #include <pthread.h>
 
@@ -29,7 +29,7 @@
 struct tt_slab {
 	uint magic;		/* Slab tag */
 	char name[16];		/* Slab name */
-	pthread_mutex_t mtx;
+	pthread_spinlock_t spl;
 	uint missed;		/* Failed allocations */
 
 	void *obj_buf;		/* Object buffer */
@@ -79,7 +79,7 @@ struct tt_slab *_tt_slab_alloc(const char *name, uint obj_sz, uint obj_cnt)
 	}
 	slab->magic = SLAB_MAGIC;
 	snprintf(slab->name, 16, "%s", name);
-	pthread_mutex_init(&slab->mtx, NULL);
+	pthread_spin_init(&slab->spl, 0);
 
 	slab->obj_sz = obj_sz;
 	slab->obj_free = slab->obj_cnt = obj_cnt;
@@ -105,7 +105,7 @@ void _tt_slab_free(struct tt_slab *slab)
 {
 	tt_assert_fa(slab->magic == SLAB_MAGIC);
 
-	pthread_mutex_destroy(&slab->mtx);
+	pthread_spin_destroy(&slab->spl);
 
 	free(slab->obj_buf);
 	free(slab);
@@ -115,12 +115,12 @@ void *_tt_slab_get_obj(struct tt_slab *slab)
 {
 	tt_assert_fa(slab->magic == SLAB_MAGIC);
 
-	pthread_mutex_lock(&slab->mtx);
+	pthread_spin_lock(&slab->spl);
 
 	/* Fallback to buddy buffer if no free object available */
 	if (slab->obj_free == 0) {
 		slab->missed++;
-		pthread_mutex_unlock(&slab->mtx);
+		pthread_spin_unlock(&slab->spl);
 		tt_debug("Cannot get slab object: %s", slab->name);
 		return _tt_get_buf(slab->obj_sz);
 	}
@@ -128,7 +128,6 @@ void *_tt_slab_get_obj(struct tt_slab *slab)
 	/* Pick free object */
 	int tmp_idx = slab->next_idx[slab->free_idx];
 	void *obj_ptr = slab->obj_buf + slab->free_idx * slab->obj_sz;
-	tt_assert_fa(((size_t)obj_ptr & 7) == 0);
 
 	/* Swap free_idx and next_idx[free_idx] */
 	slab->next_idx[slab->free_idx] = slab->free_idx | BIT(31);
@@ -138,8 +137,9 @@ void *_tt_slab_get_obj(struct tt_slab *slab)
 	tt_assert_fa((slab->obj_free == 0 && slab->free_idx == ~BIT(31)) ||
 			(slab->obj_free > 0 && slab->free_idx >= 0));
 
-	pthread_mutex_unlock(&slab->mtx);
+	pthread_spin_unlock(&slab->spl);
 
+	tt_assert_fa(((size_t)obj_ptr & 7) == 0);
 	return obj_ptr;
 }
 
@@ -157,7 +157,7 @@ void _tt_slab_put_obj(struct tt_slab *slab, void *obj)
 	tt_assert_fa(offset % slab->obj_sz == 0);
 	int obj_idx = offset / slab->obj_sz;
 
-	pthread_mutex_lock(&slab->mtx);
+	pthread_spin_lock(&slab->spl);
 
 	/* Swap free_idx and next_idx[obj_idx] */
 	__tt_swap(slab->free_idx, slab->next_idx[obj_idx]);
@@ -166,5 +166,5 @@ void _tt_slab_put_obj(struct tt_slab *slab, void *obj)
 
 	slab->obj_free++;
 
-	pthread_mutex_unlock(&slab->mtx);
+	pthread_spin_unlock(&slab->spl);
 }

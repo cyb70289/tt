@@ -1,7 +1,6 @@
 lib-y := libttcommon.a
 
-dir-y += arch
+dir-y += arch mm
 
 obj-y += lib.o log.o key.o fpe.o round.o
-obj-y += buf-buddy.o buf-slab.o
 obj-y += sort.o stack.o queue.o heap.o tree.o
