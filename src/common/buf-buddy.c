@@ -1,5 +1,4 @@
-/* Buffer management
- * - Buddy algorithm for random size block
+/* Random size buffer management - Buddy algorithm
  *
  * Copyright (C) 2015 Yibo Cai
  */
@@ -9,7 +8,7 @@
 
 #include <pthread.h>
 
-/* Buddy memory pool
+/* Memory pool
  * - Block size = 2^n - 8
  * - Layout
  * Block list         Block-1                    Block-2
@@ -38,6 +37,7 @@
 struct pool {
 	uint size;		/* Buffer size */
 	uint free;		/* Free buffer size */
+	uint missed;		/* Failed allocations */
 	const void *buf;	/* Buffer address */
 	int blks;		/* Block header array size */
 	struct tt_list *heads;	/* Block header array */
@@ -55,7 +55,6 @@ struct pool_block {
 	};
 };
 
-static int __missed;	/* Failed allocation */
 static struct pool __pool = {
 	.mtx = PTHREAD_MUTEX_INITIALIZER,
 };
@@ -161,7 +160,7 @@ void *_tt_get_buf(size_t sz)
 
 	/* Fallback to malloc if no free buffer available */
 	if (idx == pool->blks) {
-		__missed++;
+		pool->missed++;
 		pthread_mutex_unlock(&pool->mtx);
 		tt_debug("Cannot get buffer: %u %u", sz, pool->free);
 		return malloc(sz);
@@ -178,7 +177,7 @@ void *_tt_get_buf(size_t sz)
 	tt_list_del(&blk->link);
 	pool->free -= pool_index_to_size(blk_idx);
 
-	/* Link resident blocks to related free list */
+	/* Link residual blocks to related free list */
 	struct pool_block *newblk;
 	void *ptr = (void *)blk + pool_index_to_size(blk_idx);
 	for (int i = blk_idx; i < idx; i++) {
@@ -285,36 +284,8 @@ void _tt_put_buf(void *buf)
 	pthread_mutex_unlock(&pool->mtx);
 }
 
-#if CONFIG_DEBUG_LEVEL >= 2
-/* Check buddy buffer sanity. No locking. */
-int __tt_buf_check(const struct pool **ppool)
+/* Only for testing purpose */
+const struct pool *__get_pool(void)
 {
-	const struct pool *pool = &__pool;
-	*ppool = pool;
-
-	/* Verify all blocks */
-	const void *buf = pool->buf;
-	const struct pool_block *blk = buf;
-
-	while (buf < pool->buf + pool->size) {
-		if (blk->magic != BLOCK_MAGIC_FREE &&
-				blk->magic != BLOCK_MAGIC_ALLOC) {
-			tt_error("Buffer magic error");
-			return TT_EINVAL;
-		}
-
-		uint blk_sz = pool_index_to_size(blk->blk_idx);
-		uint align = buf - pool->buf;
-		if ((align % blk_sz)) {
-			tt_error("Buffer alignment error");
-			return TT_EINVAL;
-		}
-
-		buf += blk_sz;
-		blk = buf;
-	}
-	tt_assert(buf == pool->buf + pool->size);
-
-	return 0;
+	return &__pool;
 }
-#endif

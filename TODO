@@ -1,4 +1,3 @@
-- slab buffer management
 - makefile: LDLIBS should be set with each binary
 - apn compare
 - apn_to_float: long double to double conversion may result to wrong result
