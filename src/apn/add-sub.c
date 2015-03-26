@@ -48,7 +48,6 @@ static uint add_dig(uint dig, uint dig2, char *carry)
 
 /* dig += dig2
  * - msb: digit length, may <= 0
- * - dig and dig2 may share same buffer
  * - dig must have enouth space to hold result(include possible carry)
  * - return result digit length
  */
@@ -83,7 +82,6 @@ static int add_digs(uint *dig, const int msb, const uint *dig2, const int msb2)
 		uint u = dig[i-1];
 		/* Get new msb */
 		int msbr = (i - 1) * 9;
-		int l;
 		if ((u >> 22))
 			msbr += (_tt_digits(u >> 22) + 6);
 		else if ((u >> 11) & 0x3FF)
@@ -94,6 +92,125 @@ static int add_digs(uint *dig, const int msb, const uint *dig2, const int msb2)
 		tt_assert_fa(msbr == msbs || msbr == (msbs+1));
 		return msbr;
 	}
+}
+
+/* Sub two uint(9 digit decimals) and re-arrange
+ * - carry: input: carry bit of top 3 digits of lower uint
+ * - carry: output: carry bit of top 3 digits of this uint
+ * return arranged digit
+ */
+static uint sub_dig(uint dig, uint dig2, char *carry)
+{
+	dig |= (BIT(10) | BIT(21));
+	dig = _tt_sub_uint(dig - *carry, dig2, carry);
+
+	/* Split to 3-digit sets */
+	uint xdig[3];	/* Extended digit with 11 bits */
+	xdig[0] = dig & 0x7FF;
+	xdig[1] = (dig >> 11) & 0x7FF;
+	xdig[2] = dig >> 22;
+	if (*carry) {
+		xdig[2] = ~xdig[2];
+		xdig[2] &= 0x3FF;
+		xdig[2] = 1023 - xdig[2];
+	} else {
+		xdig[2] += 1024;
+	}
+
+	/* Check underflow */
+	if (xdig[0] < 1024) {
+		xdig[0] -= 24;
+		xdig[1]--;
+	} else {
+		xdig[0] -= 1024;
+	}
+	if (xdig[1] < 1024) {
+		xdig[1] -= 24;
+		xdig[2]--;
+	} else {
+		xdig[1] -= 1024;
+	}
+	if (xdig[2] < 1024) {
+		xdig[2] -= 24;
+		*carry = 1;
+	} else {
+		xdig[2] -= 1024;
+	}
+
+	/* Combine to one uint */
+	return (xdig[2] << 22) | (xdig[1] << 11) | xdig[0];
+}
+
+/* dig = dig1 - dig2
+ * - dig1 >= dig2
+ * - msb: digit length, may <= 0
+ * - dig must have enouth space to hold result
+ * - dig may share buffer with dig1 or dig2
+ * - dig must be zeroed if not shared with dig1 or dig2
+ * - return result digit length
+ */
+static int sub_digs(uint *dig, const uint *dig1, const int msb1,
+		const uint *dig2, const int msb2)
+{
+	tt_assert_fa(msb1 >= msb2);
+
+	int i, msbr = 1;
+	char carry = 0;
+
+	/* dig1 - dig2 */
+	const int uints2 = (msb2 + 8) / 9;
+	for (i = 0; i < uints2; i++)
+		dig[i] = sub_dig(dig1[i], dig2[i], &carry);
+
+	/* Process remaining high digits in dig1 */
+	const int uints1 = (msb1 + 8) / 9;
+	for (; i < uints1; i++)
+		dig[i] = sub_dig(dig1[i], 0, &carry);
+	tt_assert_fa(carry == 0);
+
+	/* Check new MSB */
+	for (i = uints1 - 1; i >= 0; i--) {
+		uint u = dig[i];
+		if (u) {
+			/* Get msb */
+			msbr = i * 9;
+			if ((u >> 22))
+				msbr += (_tt_digits(u >> 22) + 6);
+			else if ((u >> 11) & 0x3FF)
+				msbr += (_tt_digits((u >> 11) & 0x3FF) + 3);
+			else
+				msbr += _tt_digits(u & 0x3FF);
+			break;
+		}
+	}
+	tt_assert_fa((msbr <= msb1 || msb1 <= 0) && msbr >= 1);
+
+	return msbr;
+}
+
+/* Compare digits
+ * - msb: digit length, may <= 0
+ * - return: 1 - dig1 > dig2, 0 - dig1 == dig2, -1 - dig1 < dig2
+ */
+static int cmp_digs(const uint *dig1, const int msb1,
+		const uint *dig2, const int msb2)
+{
+	if (msb1 <= 0 && msb2 <= 0)
+		return 0;
+	if (msb1 < msb2)
+		return -1;
+	if (msb1 > msb2)
+		return 1;
+
+	/* Compare digits: msb1 = msb2 > 0 */
+	const int uints = (msb1 + 8) / 9;
+	for (int i = uints - 1; i >= 0; i--) {
+		if (dig1[i] > dig2[i])
+			return 1;
+		else if (dig1[i] < dig2[i])
+			return -1;
+	}
+	return 0;
 }
 
 /* Left shift adj digits
@@ -296,29 +413,12 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 	return msb;
 }
 
-/* Sub significands
- * - dst won't overlap with src1 and src2
- * - exp_adj1 >= exp_adj2, exp_adj2 <= 0
- * - significand needs to shift exp_adj digits(+,left; -,right)
- * - src1 >= src2
- * - return: 0, TT_APN_EROUNDED
- */
-static int sub_sig(struct tt_apn *dst, const struct tt_apn *src1, int exp_adj1,
-		const struct tt_apn *src2, int exp_adj2)
-{
-	return 0;
-}
-
-/* Compare significands
- * - dst is different with src1 and src2
- * - each significand needs to shift exp_adj digits before compare
- * - return: 1 - src1 > src2, 0 - src1 == src2, -1 - src1 < src2
- */
-static int cmp_sig(const struct tt_apn *src1, int exp_adj1,
-		const struct tt_apn *src2, int exp_adj2)
-{
-	return 0;
-}
+/* 10^n, n = 0 ~ 8 */
+static const uint one_tbl[] = {
+	1, 10, 100,
+	1U << 11, 10U << 11, 100U << 11,
+	1U << 22, 10U << 22, 100U << 22,
+};
 
 /* dst = src1 + src2
  * dst may be a new APN, src1 or src2
@@ -418,48 +518,62 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 	tt_assert_fa(dst2->_prec_full > (src2->_msb + exp_adj2));
 	shift_digs(tmpdig, src2->_dig32, src2->_msb, exp_adj2);
 
-	/* - Compare sign, decide to do "+" or "-"
-	 * - Compare adjusted signficand abs value, and decide the order of "-"
-	 */
+	/* Compare sign, decide to do "+" or "-" */
+	int msb;
 	if (src1->_sign == src2->_sign) {
 		/* Adding... */
 		dst2->_sign = src1->_sign;
 		/* Add aligned significands */
-		int msb = add_digs(dst2->_dig32, src1->_msb + exp_adj1,
+		msb = add_digs(dst2->_dig32, src1->_msb + exp_adj1,
 				tmpdig, src2->_msb + exp_adj2);
-		/* Check rounding */
-		if (adj_adj) {
-			if (_tt_round(_tt_apn_get_dig(dst2->_dig32, adj_adj) & 1,
-					_tt_apn_get_dig(dst2->_dig32, adj_adj-1), 0)) {
-				uint one = 1;
-				msb = add_digs(dst2->_dig32, msb, &one, 1);
-			}
-		}
-		/* Adjust significand, msb */
-		dst2->_msb = msb - adj_adj;
-		tt_assert_fa(dst2->_msb >= 1 && dst2->_msb <= (dst2->_prec+1));
-		if (dst2->_msb > dst2->_prec) {
-			adj_adj++;
-			dst2->_msb--;
-			dst2->_exp++;	/* TODO: xflow */
-			ret = TT_APN_EROUNDED;
-		}
-		shift_digs(dst2->_dig32, dst2->_dig32, msb, -adj_adj);
 	} else {
 		/* Substracting... */
-		int cmp12 = cmp_sig(src1, exp_adj1, src2, exp_adj2);
+		/* Pick bigger value */
+		int cmp12 = cmp_digs(dst2->_dig32, src1->_msb + exp_adj1,
+				tmpdig, src2->_msb + exp_adj2);
+		/* Substract aligned significands */
 		if (cmp12 >= 0) {
 			dst2->_sign = src1->_sign;
-			ret = sub_sig(dst2, src1, exp_adj1, src2, exp_adj2);
+			msb = sub_digs(dst2->_dig32,
+					dst2->_dig32, src1->_msb + exp_adj1,
+					tmpdig, src2->_msb + exp_adj2);
 		} else {
 			dst2->_sign = src2->_sign;
-			ret = sub_sig(dst2, src2, exp_adj2, src1, exp_adj1);
+			msb = sub_digs(dst2->_dig32,
+					tmpdig, src2->_msb + exp_adj2,
+					dst2->_dig32, src1->_msb + exp_adj1);
 		}
 	}
 
+	/* Check rounding */
+	if (adj_adj) {
+		if (_tt_round(_tt_apn_get_dig(dst2->_dig32, adj_adj) & 1,
+				_tt_apn_get_dig(dst2->_dig32, adj_adj-1), 0)) {
+			/* Construct 10^adj_adj */
+			tt_assert_fa(adj_adj < 36);
+			uint one[4] = { 0, 0, 0, 0 };
+			one[adj_adj / 9] = one_tbl[adj_adj % 9];
+			msb = add_digs(dst2->_dig32, msb, one, adj_adj+1);
+		}
+	}
+	/* Adjust significand, msb */
+	dst2->_msb = msb - adj_adj;
+	/* Only happen on substracting */
+	if (dst2->_msb <= 0)
+		dst2->_msb = 1;
+	tt_assert_fa(dst2->_msb >= 1 && dst2->_msb <= (dst2->_prec+1));
+	/* Only happen on adding */
+	if (dst2->_msb > dst2->_prec) {
+		adj_adj++;
+		dst2->_msb--;
+		dst2->_exp++;	/* TODO: xflow */
+		ret = TT_APN_EROUNDED;
+	}
+	shift_digs(dst2->_dig32, dst2->_dig32, msb, -adj_adj);
+
 	free(tmpdig);
 
-	/* Copy to dst if overlap with src */
+	/* Switch buffer if dst overlap with src */
 	if (dst2 != dst) {
 		free(dst->_dig32);
 		memcpy(dst, dst2, sizeof(struct tt_apn));

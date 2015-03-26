@@ -55,7 +55,7 @@ static int parse_coef(struct tt_apn *apn, const char *s, int len, int *adjexp,
 	/* Check rounding */
 	const char *s2 = s + len - 1;
 	if (digs > apn->_prec) {
-		tt_warn("APN rounded: %d -> %d", digs, apn->_prec);
+		tt_info("APN rounded: %d -> %d", digs, apn->_prec);
 		ret = TT_APN_EROUNDED;
 
 		/* Drop trailing digits */

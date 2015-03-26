@@ -49,28 +49,33 @@ static double gen_float(int mexp)
 }
 #endif
 
-static bool deq(double d1, double d2)
+static bool deq(double d1, double d2, double prec)
 {
 	if (d1 == 0)
 		return d2 == 0;
 	long double dd = (long double)d1 - (long double)d2;
 	dd /= d1;
-	return dd < 1E-15;
+	return dd < prec;
 }
 
 static long double get_num(char *s, int lmin, int lmax)
 {
 	long double ld = 0;
 
-	/* len: lmin ~ lmax */
-	int len = lmin + rand() % (lmax - lmin + 1);
-	for (int i = 0; i < len; i++) {
+	s[0] = ((rand() & 1)) ? '-' : '+';
+
+	/* len: lmin+1 ~ lmax+1 */
+	int len = lmin + rand() % (lmax - lmin + 1) + 1;
+	for (int i = 1; i < len; i++) {
 		s[i] = rand() % 10;
 		ld *= 10;
 		ld += s[i];
 		s[i] += '0';
 	}
 	s[len] = '\0';
+
+	if (s[0] == '-')
+		ld = -ld;
 
 	return ld;
 }
@@ -81,7 +86,7 @@ static void verify_add(int count)
 	char s[1024];
 	struct tt_apn *apn1, *apn2, *apn3;
 
-	int old_level = tt_log_set_level(TT_LOG_ERROR);
+	int old_level = tt_log_set_level(TT_LOG_WARN);
 
 	/* Special case */
 	apn1 = tt_apn_alloc(0);
@@ -95,6 +100,11 @@ static void verify_add(int count)
 		{ "0E-2000", "0", "0E-2000" },
 		{ "0E-20", "0E-10", "0E-20" },
 		{ "0E-20", "0E-1000", "0E-1000" },
+		{ "-0", "0", "-0", },
+		{ "0E-10", "-0", "-0E-10" },
+		{ "-0E-2000", "0", "0E-2000" },
+		{ "0E-20", "-0E-10", "-0E-20" },
+		{ "-0E-20", "0E-1000", "-0E-1000" },
 	};
 	for (int i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
 		tt_apn_from_string(apn1, cases[i].add1);
@@ -132,6 +142,9 @@ static void verify_add(int count)
 		tt_apn_from_string(apn1, s1);
 		ld += get_num(s2, 1, 100);
 		tt_apn_from_string(apn2, s2);
+		double prec = 1E-15;
+		if (apn1->_sign != apn2->_sign)
+			prec = 1E-14;
 		tt_apn_add(apn3, apn2, apn1);
 		tt_apn_add(apn2, apn1, apn2);
 		tt_apn_to_float(apn3, &d1);
@@ -144,12 +157,10 @@ static void verify_add(int count)
 			break;
 		}
 
-		if (!deq(ld, d1) || !deq(ld, d2)) {
-			tt_error("Num add error: %s + %s\nCorrect: %.18LE\n"
-					"Error:   %.18E\nError:   %.18E ",
+		if (!deq(ld, d1, prec) || !deq(ld, d2, prec)) {
+			tt_warn("Num add mismatch: %s + %s\nMach: %.18LE\n"
+					"APN:  %.18E\nAPN:  %.18E",
 					s1, s2, ld, d1, d2);
-			fail = true;
-			break;
 		}
 	}
 
@@ -169,10 +180,9 @@ static void verify_add(int count)
 	for (int i = 0; i < count; i++) {
 		double d1 = gen_float(307);
 		double d2 = gen_float(307);
-
-		/* XXX: only support same sign now */
+		double prec = 1E-15;
 		if (signbit(d1) != signbit(d2))
-			d1 = -d1;
+			prec = 1E-14;
 
 		tt_apn_from_float(apn1, d1);
 		tt_apn_from_float(apn2, d2);
@@ -192,14 +202,12 @@ static void verify_add(int count)
 		tt_apn_to_float(apn1, &vd2);
 
 		double ds = d1 + d2;
-		if (!deq(vd1, ds) || !deq(vd2, ds)) {
-			tt_error("Float add error: %.18E + %.18E\n"
-				       "Correct: %.18E\n"
-				       "Error:   %.18E\n"
-				       "Error:   %.18E",
+		if (!deq(vd1, ds, prec) || !deq(vd2, ds, prec)) {
+			tt_warn("Float add mismatch: %.18E + %.18E\n"
+				       "Mach: %.18E\n"
+				       "APN:  %.18E\n"
+				       "APN:  %.18E",
 				       d1, d2, ds, vd1, vd2);
-			fail = true;
-			break;
 		}
 	}
 	tt_apn_free(apn1);
@@ -252,6 +260,8 @@ int main(void)
 	printf("add: %s\n     %.18E\n", s, dv);
 	if (_tt_apn_sanity(apn2))
 		tt_error("APN sanity error!");
+	tt_apn_free(apn2);
+	tt_apn_free(apn3);
 
 	const char *sci[] = {
 #if 0
