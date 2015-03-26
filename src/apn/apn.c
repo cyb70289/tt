@@ -10,19 +10,6 @@
 #include <string.h>
 #include <pthread.h>
 
-/* tt_apn structure slab buffer */
-static struct tt_slab *__slab_apn;
-
-static __attribute__ ((constructor)) void slab_init(void)
-{
-	__slab_apn = _tt_slab_alloc("tt_apn", sizeof(struct tt_apn), 0);
-}
-
-static __attribute__ ((destructor)) void slab_deinit(void)
-{
-	_tt_slab_free(__slab_apn);
-}
-
 /* Creator */
 struct tt_apn *tt_apn_alloc(uint prec)
 {
@@ -45,21 +32,18 @@ struct tt_apn *tt_apn_alloc(uint prec)
 	int digsz = prec_full;
 	digsz += 8;
 	digsz /= 9;
-	digsz *= 4;
 
 	/* Create APN */
-	struct tt_apn *apn = _tt_slab_get_obj(__slab_apn);
-	memset(apn, 0, sizeof(struct tt_apn));
-	apn->_dig32 = _tt_get_buf(digsz);
+	struct tt_apn *apn = calloc(1, sizeof(struct tt_apn));
+	apn->_dig32 = calloc(digsz, 4);
 	if (apn->_dig32 == NULL) {
 		tt_error("Not enough memory");
 		free(apn);
 		return NULL;
 	}
-	memset(apn->_dig32, 0, digsz);
 	*(int*)&apn->_prec = prec;
 	*(int*)&apn->_prec_full = prec_full;
-	*(uint*)&apn->_digsz = digsz;
+	*(uint*)&apn->_digsz = digsz * 4;
 	apn->_msb = 1;
 	tt_debug("APN created: %u bytes", apn->_digsz);
 
@@ -68,14 +52,8 @@ struct tt_apn *tt_apn_alloc(uint prec)
 
 void tt_apn_free(struct tt_apn *apn)
 {
-	_tt_put_buf(apn->_dig32);
-	_tt_slab_put_obj(__slab_apn, apn);
-}
-
-/* Don't free digit buffer */
-void __tt_apn_free2(struct tt_apn *apn)
-{
-	_tt_slab_put_obj(__slab_apn, apn);
+	free(apn->_dig32);
+	free(apn);
 }
 
 /* apn = 0 */

@@ -56,7 +56,7 @@ CFLAGS		+= -Wall -Werror -Wstrict-prototypes -std=gnu99
 AFLAGS		+= -I$(TOPDIR)/include
 
 # Extra libraries
-LDLIBS		+= -lm -lpthread
+LDLIBS		+= -lm
 
 # Target specific flags
 CFLAGS		+= $(CFLAGS_TARGET)

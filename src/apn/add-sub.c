@@ -413,7 +413,7 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 	shift_digs(dst2->_dig32, src1->_dig32, src1->_msb, exp_adj1);
 
 	/* Copy adjusted significand of src2 to temporary buffer */
-	uint *tmpdig = _tt_get_buf(dst2->_digsz);
+	uint *tmpdig = malloc(dst2->_digsz);
 	memset(tmpdig, 0, dst2->_digsz);
 	tt_assert_fa(dst2->_prec_full > (src2->_msb + exp_adj2));
 	shift_digs(tmpdig, src2->_dig32, src2->_msb, exp_adj2);
@@ -457,14 +457,13 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 		}
 	}
 
-	_tt_put_buf(tmpdig);
+	free(tmpdig);
 
 	/* Copy to dst if overlap with src */
 	if (dst2 != dst) {
-		_tt_put_buf(dst->_dig32);
+		free(dst->_dig32);
 		memcpy(dst, dst2, sizeof(struct tt_apn));
-		void __tt_apn_free2(struct tt_apn *apn);
-		__tt_apn_free2(dst2);
+		free(dst2);
 	}
 
 	if (ret == TT_APN_EROUNDED)
