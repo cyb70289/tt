@@ -130,7 +130,7 @@ static void verify_add(int count)
 		return;
 
 	/* Big number */
-	printf("Testing big number...\n");
+	printf("Add big number...\n");
 	apn1 = tt_apn_alloc(30);
 	apn2 = tt_apn_alloc(50);
 	apn3 = tt_apn_alloc(40);
@@ -172,7 +172,7 @@ static void verify_add(int count)
 
 #ifdef __STDC_IEC_559__
 	/* Random float */
-	printf("Testing float...\n");
+	printf("Add float...\n");
 	apn1 = tt_apn_alloc(0);
 	apn2 = tt_apn_alloc(0);
 	apn3 = tt_apn_alloc(0);
@@ -204,10 +204,102 @@ static void verify_add(int count)
 		double ds = d1 + d2;
 		if (!deq(vd1, ds, prec) || !deq(vd2, ds, prec)) {
 			tt_warn("Float add mismatch: %.18E + %.18E\n"
-				       "Mach: %.18E\n"
-				       "APN:  %.18E\n"
-				       "APN:  %.18E",
-				       d1, d2, ds, vd1, vd2);
+					"Mach: %.18E\nAPN:  %.18E\nAPN:  %.18E",
+					d1, d2, ds, vd1, vd2);
+		}
+	}
+	tt_apn_free(apn1);
+	tt_apn_free(apn2);
+	tt_apn_free(apn3);
+#endif
+
+	tt_log_set_level(old_level);
+}
+
+static void verify_sub(int count)
+{
+	bool fail = false;
+	struct tt_apn *apn1, *apn2, *apn3;
+
+	int old_level = tt_log_set_level(TT_LOG_WARN);
+
+	/* Big number */
+	printf("Subtract big number...\n");
+	apn1 = tt_apn_alloc(30);
+	apn2 = tt_apn_alloc(50);
+	apn3 = tt_apn_alloc(40);
+	for (int i = 0; i < count; i++) {
+		double d1, d2;
+		long double ld;
+		char s1[128], s2[128];
+		ld = get_num(s1, 1, 100);
+		tt_apn_from_string(apn1, s1);
+		ld -= get_num(s2, 1, 100);
+		tt_apn_from_string(apn2, s2);
+		double prec = 1E-15;
+		if (apn1->_sign == apn2->_sign)
+			prec = 1E-14;
+		tt_apn_sub(apn3, apn2, apn1);
+		tt_apn_sub(apn2, apn1, apn2);
+		tt_apn_to_float(apn3, &d1);
+		tt_apn_to_float(apn2, &d2);
+
+		if (_tt_apn_sanity(apn1) || _tt_apn_sanity(apn2) ||
+				_tt_apn_sanity(apn3)) {
+			tt_error("Sanity error");
+			fail = true;
+			break;
+		}
+
+		if (!deq(ld, -d1, prec) || !deq(ld, d2, prec)) {
+			tt_warn("Num sub mismatch: %s - %s\nMach: %.18LE\n"
+					"APN:  %.18E\nAPN:  %.18E",
+					s1, s2, ld, -d1, d2);
+		}
+	}
+
+	tt_apn_free(apn1);
+	tt_apn_free(apn2);
+	tt_apn_free(apn3);
+	if (fail)
+		return;
+
+#ifdef __STDC_IEC_559__
+	/* Random float */
+	printf("Subtract float...\n");
+	apn1 = tt_apn_alloc(0);
+	apn2 = tt_apn_alloc(0);
+	apn3 = tt_apn_alloc(0);
+
+	for (int i = 0; i < count; i++) {
+		double d1 = gen_float(307);
+		double d2 = gen_float(307);
+		double prec = 1E-15;
+		if (signbit(d1) == signbit(d2))
+			prec = 1E-14;
+
+		tt_apn_from_float(apn1, d1);
+		tt_apn_from_float(apn2, d2);
+
+		tt_apn_sub(apn3, apn1, apn2);
+		tt_apn_sub(apn1, apn2, apn1);
+
+		if (_tt_apn_sanity(apn1) || _tt_apn_sanity(apn2) ||
+				_tt_apn_sanity(apn3)) {
+			tt_error("Sanity error");
+			fail = true;
+			break;
+		}
+
+		double vd1, vd2;
+		tt_apn_to_float(apn3, &vd1);
+		tt_apn_to_float(apn1, &vd2);
+
+		double ds = d1 - d2;
+		if (!deq(vd1, ds, prec) || !deq(-vd2, ds, prec)) {
+			tt_warn("Float sub mismatch: %.18E - %.18E\n"
+					"Mach: %.18E\nAPN:  %.18E\nAPN:  %.18E",
+					d1, d2, ds, vd1, -vd2);
 		}
 	}
 	tt_apn_free(apn1);
@@ -220,11 +312,10 @@ static void verify_add(int count)
 
 int main(void)
 {
+#if 0
 	struct tt_apn *apn = tt_apn_alloc(50);
 	char s[2000];
-	double dv;
 
-#if 1
 	tt_apn_from_sint(apn, 1ULL << 63);
 	tt_apn_to_string(apn, s, 100);
 	printf("sint: %s == %lld\n", s, 1ULL << 63);
@@ -248,8 +339,8 @@ int main(void)
 	tt_apn_from_float(apn, *(double *)&dmax);
 	tt_apn_to_string(apn, s, 100);
 	printf("min double: %s\n", s);
-#endif
 
+	double dv;
 	struct tt_apn *apn3 = tt_apn_alloc(320);
 	tt_apn_from_string(apn3, "1.218789511116565398");
 	struct tt_apn *apn2 = tt_apn_alloc(320);
@@ -263,13 +354,24 @@ int main(void)
 	tt_apn_free(apn2);
 	tt_apn_free(apn3);
 
+	apn3 = tt_apn_alloc(320);
+	tt_apn_from_string(apn3, "541295929775964129640116467012286");
+	apn2 = tt_apn_alloc(320);
+	tt_apn_from_string(apn2, "541295929775964129640116467012286");
+	tt_apn_sub(apn2, apn3, apn2);
+	tt_apn_to_string(apn2, s, 1000);
+	tt_apn_to_float(apn2, &dv);
+	printf("sub: %s\n     %.18E\n", s, dv);
+	if (_tt_apn_sanity(apn2))
+		tt_error("APN sanity error!");
+	tt_apn_free(apn2);
+	tt_apn_free(apn3);
+
 	const char *sci[] = {
-#if 0
 		"+123", "-1234", "0", "0.00", "1.23E3", "1.2345e+3", "12.E+7",
 		"12.0", "12.3456", "0.001234567", "-.23E-12", "1234.E-4", "-0",
 		"-0.00", "0E+7", "-0E-7", "inf", "-NaN",
 		"-", "+E1", ".", ".E12", "1.2E3.", "-3#5", ".E", "3E", "1.1.E1",
-#endif
 		"123456789012345678901234567890123456789012345678935234567890",
 		"-999999999999999999999999999999999999999999999999999999999999",
 	};
@@ -285,10 +387,12 @@ int main(void)
 				printf("%s\n", s);
 		}
 	}
+#endif
 
 	srand(time(NULL));
 
 	verify_add(100000);
+	verify_sub(100000);
 
 	return 0;
 }

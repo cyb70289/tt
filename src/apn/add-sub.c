@@ -420,13 +420,19 @@ static const uint one_tbl[] = {
 	1U << 22, 10U << 22, 100U << 22,
 };
 
-/* dst = src1 + src2
- * dst may be a new APN, src1 or src2
+/* dst = src1 +/- src2
+ * - sub: 0 -> add, 1 -> sub
+ * - dst may share with src1 or src2
  */
-int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
-		const struct tt_apn *src2)
+static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
+		const struct tt_apn *src2, int sub)
 {
 	int ret = 0;
+
+	int sign1 = src1->_sign;
+	int sign2 = src2->_sign;
+	if (sub)
+		sign2 = !sign2;
 
 	/* Check NaN, Inf */
 	if (src1->_inf_nan == TT_APN_NAN || src2->_inf_nan == TT_APN_NAN) {
@@ -435,8 +441,7 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 	}
 	if (src1->_inf_nan == TT_APN_INF || src2->_inf_nan == TT_APN_INF) {
 		dst->_inf_nan = TT_APN_INF;
-		dst->_sign = (src1->_inf_nan == TT_APN_INF ?
-			src1->_sign : src2->_sign);
+		dst->_sign = (src1->_inf_nan == TT_APN_INF ? sign1 : sign2);
 		return TT_APN_EOVERFLOW;
 	}
 
@@ -458,6 +463,7 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 	if (exp_adj1 < 0) {
 		exp_adj1 = -exp_adj1;
 		__tt_swap(src1, src2);
+		__tt_swap(sign1, sign2);
 	}
 
 	/* Check rounding */
@@ -520,9 +526,9 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 
 	/* Compare sign, decide to do "+" or "-" */
 	int msb;
-	if (src1->_sign == src2->_sign) {
+	if (sign1 == sign2) {
 		/* Adding... */
-		dst2->_sign = src1->_sign;
+		dst2->_sign = sign1;
 		/* Add aligned significands */
 		msb = add_digs(dst2->_dig32, src1->_msb + exp_adj1,
 				tmpdig, src2->_msb + exp_adj2);
@@ -533,12 +539,12 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 				tmpdig, src2->_msb + exp_adj2);
 		/* Substract aligned significands */
 		if (cmp12 >= 0) {
-			dst2->_sign = src1->_sign;
+			dst2->_sign = sign1;
 			msb = sub_digs(dst2->_dig32,
 					dst2->_dig32, src1->_msb + exp_adj1,
 					tmpdig, src2->_msb + exp_adj2);
 		} else {
-			dst2->_sign = src2->_sign;
+			dst2->_sign = sign2;
 			msb = sub_digs(dst2->_dig32,
 					tmpdig, src2->_msb + exp_adj2,
 					dst2->_dig32, src1->_msb + exp_adj1);
@@ -584,4 +590,18 @@ int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
 		tt_debug("APN rounded");
 
 	return ret;
+}
+
+/* dst = src1 + src2. dst may share src1 or src2. */
+int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
+		const struct tt_apn *src2)
+{
+	return add_sub_apn(dst, src1, src2, 0);
+}
+
+/* dst = src1 - src2. dst may share src1 or src2. */
+int tt_apn_sub(struct tt_apn *dst, const struct tt_apn *src1,
+		const struct tt_apn *src2)
+{
+	return add_sub_apn(dst, src1, src2, 1);
 }
