@@ -1,5 +1,4 @@
 - makefile: LDLIBS should be set along with each binary
-- apn compare
 - apn_to_float: long double to double conversion may result to wrong result
 - add makefile config to set arch
 - _tt_is_zero()

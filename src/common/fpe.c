@@ -2,6 +2,8 @@
  *
  * Copyright (C) 2015 Yibo Cai
  */
+#if 0
+
 #define _GNU_SOURCE
 #include <tt/tt.h>
 #include "lib.h"
@@ -47,6 +49,14 @@ static void fpe_handler(int no, siginfo_t *si, void *data)
 {
 	tt_error("FPE caught at %p: %d '%s'", si->si_addr,
 			si->si_code, strfpe(si->si_code));
+
+	/* XXX: fpe continues to trigger
+	 * How to use these fucking fenv.h functions!
+	 * - feclearexcept(fpe.exceptions);
+	 * - fedisableexcept(fpe.exceptions);
+	 * - fenv_t env;
+	 * - feholdexcept(&env);
+	 */
 	abort();
 }
 
@@ -67,7 +77,9 @@ static __attribute__ ((constructor)) void fpe_init(void)
 
 static __attribute__ ((destructor)) void fpe_deinit(void)
 {
-	feclearexcept(fpe.exceptions);
+	fedisableexcept(fpe.exceptions);
 	if (fpe.hooked)
 		sigaction(SIGFPE, &fpe.sa, NULL);
 }
+
+#endif

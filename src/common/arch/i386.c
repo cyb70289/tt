@@ -1,4 +1,4 @@
-/* x86.c
+/* i386.c
  *
  * Copyright (C) 2015 Yibo Cai
  */
