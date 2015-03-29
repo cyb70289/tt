@@ -48,3 +48,6 @@ static inline void _tt_apn_to_d3_cp(uint bit10, uchar *dec3)
 
 /* Get "pos-th" digit (pos starts from 0) */
 uint _tt_apn_get_dig(const uint *dig, int pos);
+
+/* uint64 -> decimal */
+int _tt_apn_uint_to_dec(uint *dig32, uint64_t num);

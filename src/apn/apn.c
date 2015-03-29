@@ -137,3 +137,39 @@ uint _tt_apn_get_dig(const uint *dig, int pos)
 
 	return d[pos % 3];
 }
+
+/* Convert uint64 to decimal
+ * - dig must be zeroed
+ * - return MSB
+ */
+int _tt_apn_uint_to_dec(uint *dig32, uint64_t num)
+{
+	int msb = 1;
+	if (num)
+		msb = 0;	/* Compensate "0" */
+
+	int ptr = 0;
+	while (num) {
+		/* Get 3 decimals */
+		uint dec3 = num % 1000;
+		num /= 1000;
+
+		/* Increment significand */
+		if (num || dec3 > 99)
+			msb += 3;
+		else if (dec3 > 9)
+			msb +=2;
+		else
+			msb++;
+
+		/* Fill digit buffer */
+		*dig32 |= (dec3 << ptr);
+		ptr += 11;
+		if (ptr > 32) {
+			ptr = 0;
+			dig32++;
+		}
+	}
+
+	return msb;
+}

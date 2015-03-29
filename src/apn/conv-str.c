@@ -219,8 +219,10 @@ int tt_apn_to_string(const struct tt_apn *apn, char *str, uint len)
 			ptpos = -zeros + 1;
 	}
 
-	if (len2 > len)
+	if (len2 > len) {
+		snprintf(str, len, "Not enough space");
 		return TT_ENOBUFS;
+	}
 
 	/* Prepend 0 when note == 1 */
 	if (zeros > 0) {

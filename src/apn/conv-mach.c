@@ -59,32 +59,7 @@ int tt_apn_from_uint(struct tt_apn *apn, uint64_t num)
 	tt_assert(apn->_prec >= 20);
 
 	_tt_apn_zero(apn);
-	if (num)
-		apn->_msb = 0;	/* Compensate "0" */
-
-	int ptr = 0;
-	uint *dig32 = apn->_dig32;
-	while (num) {
-		/* Get 3 decimals */
-		uint dec3 = num % 1000;
-		num /= 1000;
-
-		/* Increment significand */
-		if (num || dec3 > 99)
-			apn->_msb += 3;
-		else if (dec3 > 9)
-			apn->_msb +=2;
-		else
-			apn->_msb++;
-
-		/* Fill digit buffer */
-		*dig32 |= (dec3 << ptr);
-		ptr += 11;
-		if (ptr > 32) {
-			ptr = 0;
-			dig32++;
-		}
-	}
+	apn->_msb = _tt_apn_uint_to_dec(apn->_dig32, num);
 
 	return 0;
 }

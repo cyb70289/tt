@@ -1,4 +1,4 @@
-/* Add, Sub
+/* Add, Sub, Multiply, Divide
  *
  * Copyright (C) 2015 Yibo Cai
  */
@@ -10,6 +10,28 @@
 #include <string.h>
 
 #pragma GCC diagnostic ignored "-Wunused-variable"
+
+/* Get MSB of dig[0] ~ dig[uints-1] */
+static int get_msb(const uint *dig, const int uints)
+{
+	int msb = 1;
+
+	for (int i = uints - 1; i >= 0; i--) {
+		uint u = dig[i];
+		if (u) {
+			msb = i * 9;
+			if ((u >> 22))
+				msb += (_tt_digits(u >> 22) + 6);
+			else if ((u >> 11) & 0x3FF)
+				msb += (_tt_digits((u >> 11) & 0x3FF) + 3);
+			else
+				msb += _tt_digits(u & 0x3FF);
+			break;
+		}
+	}
+
+	return msb;
+}
 
 /* Add two uint(9 digit decimals) and re-arrange
  * - carry: input: carry bit of top 3 digits of lower uint
@@ -154,7 +176,7 @@ static int sub_digs(uint *dig, const uint *dig1, const int msb1,
 {
 	tt_assert_fa(msb1 >= msb2);
 
-	int i, msbr = 1;
+	int i;
 	char carry = 0;
 
 	/* dig1 - dig2 */
@@ -169,23 +191,85 @@ static int sub_digs(uint *dig, const uint *dig1, const int msb1,
 	tt_assert_fa(carry == 0);
 
 	/* Check new MSB */
-	for (i = uints1 - 1; i >= 0; i--) {
-		uint u = dig[i];
-		if (u) {
-			/* Get msb */
-			msbr = i * 9;
-			if ((u >> 22))
-				msbr += (_tt_digits(u >> 22) + 6);
-			else if ((u >> 11) & 0x3FF)
-				msbr += (_tt_digits((u >> 11) & 0x3FF) + 3);
-			else
-				msbr += _tt_digits(u & 0x3FF);
-			break;
-		}
-	}
+	int msbr = get_msb(dig, uints1);
 	tt_assert_fa((msbr <= msb1 || msb1 <= 0) && msbr >= 1);
 
 	return msbr;
+}
+
+/* Multiply two 9 digit decimal
+ * - dec1,2 in decimal format
+ * - return binary format
+ */
+static uint64_t mul_dec9(uint dec1, uint dec2)
+{
+	uint64_t bin1 = (dec1 >> 22) * 1000000;
+	bin1 += ((dec1 >> 11) & 0x3FF) * 1000;
+	bin1 += dec1 & 0x3FF;
+
+	uint64_t bin2 = (dec2 >> 22) * 1000000;
+	bin2 += ((dec2 >> 11) & 0x3FF) * 1000;
+	bin2 += dec2 & 0x3FF;
+
+	return bin1 * bin2;
+}
+
+/* *dig += ui64 * 10^(9*shift)
+ * - ui64 in binary format
+ * - *dig in decimal format
+ * - shift: offset in uints, >= 0
+ */
+static int shift_add_u64(uint *dig, int msb, uint64_t ui64, int shift)
+{
+	/* Convert ui64 to decimal */
+	uint dec[3] = { 0, 0, 0 };
+	int msb2 = _tt_apn_uint_to_dec(dec, ui64);
+
+	/* Add dec[] to &dig[shift] */
+	return add_digs(dig+shift, msb-shift*9, dec, msb2) + shift*9;
+}
+
+/* digr = dig1 * dig2
+ * - msb: digit length, > 0
+ * - dig1, dig2 are not zero
+ * - digr must have enouth space to hold result
+ * - digr is zeroed
+ * - return result digit length
+ */
+static int mul_digs(uint *digr, const uint *dig1, const int msb1,
+		const uint *dig2, const int msb2)
+{
+	int msb = 1;
+	const int uints1 = (msb1 + 8) / 9;
+	const int uints2 = (msb2 + 8) / 9;
+
+	for (int i = 0; i < uints1 + uints2; i++) {
+		int jmax = i;
+		if (jmax >= uints1)
+			jmax = uints1 - 1;
+		int jmin = i - uints2 + 1;
+		if (jmin < 0)
+			jmin = 0;
+
+		uint64_t tmp64 = 0;
+		int cnt = 0;
+		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++) {
+			tmp64 += mul_dec9(dig1[j], dig2[k]);
+			cnt++;
+			if (cnt == 10) {
+				/* Consume before tmp64 overflow */
+				msb = shift_add_u64(digr, msb, tmp64, i);
+				tmp64 = 0;
+				cnt = 0;
+			}
+		}
+		if (cnt)
+			msb = shift_add_u64(digr, msb, tmp64, i);
+	}
+
+	tt_assert_fa(msb >= msb1 && msb <= (msb1 + msb2));
+
+	return msb;
 }
 
 /* Compare digits
@@ -257,6 +341,7 @@ static uint rshift_dig12(uint dig32, int adj)
 
 /* Shift "src" adj digits and copy to "dst"
  * - msb: digits in src
+ * - dst_sz: buffer size of dst
  * - adj: - -> right/div, + -> left/mul
  * - (msb + adj) may <= 0
  * - dst and src may share same buffer
@@ -264,7 +349,7 @@ static uint rshift_dig12(uint dig32, int adj)
  * - dst must have enough space to hold shifted src
  * - return result digit length
  */
-static int shift_digs(uint *dst, const uint *src, int msb, int adj)
+static int shift_digs(uint *dst, uint dst_sz, const uint *src, int msb, int adj)
 {
 	int uints = (msb + 8) / 9;	/* Valid uints in src */
 	int msb_r = msb + adj;		/* Result length for debugging */
@@ -285,7 +370,7 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 	} else {
 		if (dst != src)
 			memcpy(dst, src, uints * 4);
-		return msb;		/* No shift */
+		return msb;	/* No shift */
 	}
 
 	/* Shift */
@@ -355,7 +440,9 @@ static int shift_digs(uint *dst, const uint *src, int msb, int adj)
 		if (adj9) {
 			for (i = adj9; i < uints; i++)
 				dst[i-adj9] = src[i];
-			memset(dst + uints - adj9, 0, adj9 * 4);
+			int remains = dst_sz - (uints - adj9) * 4;
+			if (remains > 0)
+				memset(dst + uints - adj9, 0, remains);
 
 			msb -= adj9 * 9;
 			uints -= adj9;
@@ -516,13 +603,17 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 
 	/* Copy adjusted significand of src1 to dst */
 	tt_assert_fa(dst2->_prec_full > (src1->_msb + exp_adj1));
-	shift_digs(dst2->_dig32, src1->_dig32, src1->_msb, exp_adj1);
+	shift_digs(dst2->_dig32, dst2->_digsz, src1->_dig32, src1->_msb, exp_adj1);
 
 	/* Copy adjusted significand of src2 to temporary buffer */
 	uint *tmpdig = malloc(dst2->_digsz);
+	if (!tmpdig) {
+		tt_error("Out of memory");
+		return TT_ENOMEM;
+	}
 	memset(tmpdig, 0, dst2->_digsz);
 	tt_assert_fa(dst2->_prec_full > (src2->_msb + exp_adj2));
-	shift_digs(tmpdig, src2->_dig32, src2->_msb, exp_adj2);
+	shift_digs(tmpdig, dst2->_digsz, src2->_dig32, src2->_msb, exp_adj2);
 
 	/* Compare sign, decide to do "+" or "-" */
 	int msb;
@@ -575,7 +666,7 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 		dst2->_exp++;	/* TODO: xflow */
 		ret = TT_APN_EROUNDED;
 	}
-	shift_digs(dst2->_dig32, dst2->_dig32, msb, -adj_adj);
+	shift_digs(dst2->_dig32, dst2->_digsz, dst2->_dig32, msb, -adj_adj);
 
 	free(tmpdig);
 
@@ -604,4 +695,96 @@ int tt_apn_sub(struct tt_apn *dst, const struct tt_apn *src1,
 		const struct tt_apn *src2)
 {
 	return add_sub_apn(dst, src1, src2, 1);
+}
+
+/* dst = src1 * src2. dst may share src1 or src2. */
+int tt_apn_mul(struct tt_apn *dst, const struct tt_apn *src1,
+		const struct tt_apn *src2)
+{
+	int ret = 0;
+
+	dst->_sign = src1->_sign ^ src2->_sign;
+
+	/* Check NaN, Inf */
+	if (src1->_inf_nan == TT_APN_NAN || src2->_inf_nan == TT_APN_NAN) {
+		dst->_inf_nan = TT_APN_NAN;
+		return TT_APN_EINVAL;
+	}
+	if (src1->_inf_nan == TT_APN_INF || src2->_inf_nan == TT_APN_INF) {
+		dst->_inf_nan = TT_APN_INF;
+		return TT_APN_EOVERFLOW;
+	}
+
+	/* Check zero */
+	if (_tt_apn_is_zero(src1) || _tt_apn_is_zero(src2)) {
+		memset(dst->_dig32, 0, dst->_digsz);
+		dst->_msb = 1;
+		if (src1->_exp == 0 || src2->_exp == 0) {
+			dst->_exp = 0;	/* True zero */
+		} else {
+			dst->_exp = src1->_exp + src1->_msb - 1 +
+				src2->_exp + src2->_msb - 1;
+			if (dst->_exp > 0)
+				dst->_exp = 0;
+		}
+		return 0;
+	}
+
+	dst->_exp = src1->_exp + src2->_exp;	/* TODO: xflow */
+
+	/* Allocate result buffer
+	 * - add one extra rounding guard digits
+	 * - add 18 digits for extra 0 introduced by uint boundary
+	 */
+	const int uints = (src1->_msb + src2->_msb + 1 + 18 + 8) / 9;
+	uint *digr = calloc(uints, 4);
+	if (!digr) {
+		tt_error("Out of memory");
+		return TT_ENOMEM;
+	}
+
+	/* Multiply */
+	int msb = mul_digs(digr, src1->_dig32, src1->_msb,
+			src2->_dig32, src2->_msb);
+
+	/* Adjust significand, msb */
+	int adj = 0;
+	if (msb > dst->_prec) {
+		adj = msb - dst->_prec;
+
+		/* Check rounding */
+		if (_tt_round(_tt_apn_get_dig(digr, adj) & 1,
+				_tt_apn_get_dig(digr, adj-1), 0)) {
+			/* Shift digr to have 1~9 extra digs */
+			if (adj >= 10) {
+				int shift = (adj - 1) / 9;
+				shift *= 9;
+				shift_digs(digr, uints*4, digr, msb, -shift);
+				adj -= shift;
+				msb -= shift;
+				dst->_exp += shift;	/* TODO: xflow */
+			}
+			/* Add 10^adj */
+			tt_assert_fa(adj >=1 && adj <= 9);
+			uint one[2] = { 0, 0 };
+			one[adj / 9] = one_tbl[adj % 9];
+			msb = add_digs(digr, msb, one, adj+1);
+			/* Get new exponent adjust */
+			adj = msb - dst->_prec;
+			tt_assert_fa(adj >= 1);
+		}
+
+		dst->_exp += adj;	/* TODO: xflow */
+		dst->_msb = dst->_prec;
+		ret = TT_APN_EROUNDED;
+	} else {
+		dst->_msb = msb;
+	}
+
+	/* Copy to dst */
+	memset(dst->_dig32, 0, dst->_digsz);
+	shift_digs(dst->_dig32, dst->_digsz, digr, msb, -adj);
+
+	free(digr);
+	return ret;
 }
