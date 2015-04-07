@@ -66,26 +66,6 @@ void _tt_apn_zero(struct tt_apn *apn)
 	memset(apn->_dig32, 0, apn->_digsz);
 }
 
-/* Increase |significand|
- * apn += { apn->_sign, 1, apn->_exp }
- */
-int _tt_apn_round_adj(struct tt_apn *apn)
-{
-	/* Construct { apn->_sign, 1, apn->_exp } */
-	uint one = 1;
-	struct tt_apn apn_1 = {
-		._sign = apn->_sign,
-		._inf_nan = 0,
-		._exp = apn->_exp,
-		._prec = 1,
-		._digsz = sizeof(one),
-		._msb = 1,
-		._dig32 = &one,
-	};
-
-	return tt_apn_add(apn, apn, &apn_1);
-}
-
 /* Check sanity */
 int _tt_apn_sanity(const struct tt_apn *apn)
 {
@@ -96,7 +76,7 @@ int _tt_apn_sanity(const struct tt_apn *apn)
 
 	/* Check carry guard bits */
 	for (i = 0; i <= last_dig_idx; i++)
-		if ((apn->_dig32[i] & (BIT(10) | BIT(21))))
+		if ((apn->_dig32[i] & (BIT(30) | BIT(31))))
 			return TT_APN_ESANITY;
 
 	/* Check remaining uints */
@@ -107,9 +87,7 @@ int _tt_apn_sanity(const struct tt_apn *apn)
 	/* Check last valid uint */
 	int last_dig_cnt = (apn->_msb - 1) % 9 + 1;
         uchar d[9];
-	_tt_apn_to_d3_cp(apn->_dig32[last_dig_idx] & 0x3FF, d);
-	_tt_apn_to_d3_cp((apn->_dig32[last_dig_idx] >> 11) & 0x3FF, d+3);
-	_tt_apn_to_d3_cp(apn->_dig32[last_dig_idx] >> 22, d+6);
+	_tt_apn_to_d9(apn->_dig32[last_dig_idx], d);
 	for (i = 8; i > last_dig_cnt - 1; i--)
 		if (d[i])
 			return TT_APN_ESANITY;
@@ -130,12 +108,11 @@ uint _tt_apn_get_dig(const uint *dig, int pos)
 {
 	uint dig32 = dig[pos / 9];
 	pos %= 9;
-	int sft = pos / 3;
-	sft *= 11;
 
-	const uchar *d = _tt_apn_to_d3((dig32 >> sft) & 0x3FF);
+	while (pos--)
+		dig32 /= 10;
 
-	return d[pos % 3];
+	return dig32 % 10;
 }
 
 /* Convert uint64 to decimal
@@ -148,27 +125,21 @@ int _tt_apn_uint_to_dec(uint *dig32, uint64_t num)
 	if (num)
 		msb = 0;	/* Compensate "0" */
 
-	int ptr = 0;
 	while (num) {
-		/* Get 3 decimals */
-		uint dec3 = num % 1000;
-		num /= 1000;
+		/* Get 9 decimals */
+		uint dec9 = num % 1000000000;
+		num /= 1000000000;
+
+		*dig32++ = dec9;
 
 		/* Increment significand */
-		if (num || dec3 > 99)
-			msb += 3;
-		else if (dec3 > 9)
-			msb +=2;
+		if (num)
+			msb += 9;
 		else
-			msb++;
-
-		/* Fill digit buffer */
-		*dig32 |= (dec3 << ptr);
-		ptr += 11;
-		if (ptr > 32) {
-			ptr = 0;
-			dig32++;
-		}
+			do {
+				msb++;
+				dec9 /= 10;
+			} while (dec9);
 	}
 
 	return msb;

@@ -34,20 +34,16 @@ struct tt_apn {
 				 * - may exceed _prec by EXT_PREC in calculation
 				 */
 	uint *_dig32;		/* Significand buffer
-				 * Bit -> 31      22 21 20     11 10 9       0
-				 *        +--------+---+--------+---+--------+
-				 * Val -> | digit3 | C | digit2 | C | digit1 |
-				 *        +--------+---+--------+---+--------+
-				 * - Each uint contains three 3-digit decimals
-				 * - Bit-10,21 carry guard
+				 * Bit -> 31  29                        0
+				 *        +--+--------------------------+
+				 * Val -> |00| Decimal: 0 ~ 999,999,999 |
+				 *        +--+--------------------------+
+				 * - Each uint contains 9-digit decimals
 				 */
 };
 
 /* Clear to zero */
 void _tt_apn_zero(struct tt_apn *apn);
-
-/* Increase abs of significand */
-int _tt_apn_round_adj(struct tt_apn *apn);
 
 /* Check if significand == 0, it's not a true zero if _exp < 0 */
 static inline bool _tt_apn_is_zero(const struct tt_apn *apn)
@@ -63,26 +59,11 @@ static inline bool _tt_apn_is_true_zero(const struct tt_apn *apn)
 /* Check sanity */
 int _tt_apn_sanity(const struct tt_apn *apn);
 
-/* 3 decimals to 10 bits */
-static inline uint _tt_apn_from_d3(const uchar *dec3)
+/* Get digits in a uint */
+static inline void _tt_apn_to_d9(uint dig, uchar *d)
 {
-	extern const uint __lut_d3_to_b10[10][10][10];
-	return __lut_d3_to_b10[dec3[2]][dec3[1]][dec3[0]];
-}
-
-/* 10 bits --> 3 decimals */
-static inline const uchar *_tt_apn_to_d3(uint bit10)
-{
-	extern const uchar __lut_b10_to_d3[1000][4];
-	return __lut_b10_to_d3[bit10];
-}
-
-static inline void _tt_apn_to_d3_cp(uint bit10, uchar *dec3)
-{
-	const uchar *d3 = _tt_apn_to_d3(bit10);
-	dec3[0] = d3[0];
-	dec3[1] = d3[1];
-	dec3[2] = d3[2];
+	for (int i = 0; i < 9; i++, dig /= 10)
+		d[i] = dig % 10;
 }
 
 /* Get "pos-th" digit (pos starts from 0) */

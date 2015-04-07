@@ -11,17 +11,6 @@
 #include <string.h>
 #include <math.h>
 
-static void d3_fill(const uchar *dec3, uint **dig32, int *ptr)
-{
-	uint bit10 = _tt_apn_from_d3(dec3);
-	**dig32 |= (bit10 << *ptr);
-	*ptr += 11;
-	if (*ptr > 32) {
-		*ptr = 0;
-		(*dig32)++;
-	}
-}
-
 static int parse_coef(struct tt_apn *apn, const char *s, int len, int *adjexp,
 		int *adjrnd)
 {
@@ -85,24 +74,25 @@ static int parse_coef(struct tt_apn *apn, const char *s, int len, int *adjexp,
 
 	/* Conversion: digits in [s, s2], may contain one point */
 	uint *dig32 = apn->_dig32;
-	uchar dec3[3];
-	int ptr = 0, cnt = 0;
+	uint dig = 0, n10 = 1;
+	int cnt = 0;
 	while (s2 >= s) {
 		if (*s2 != '.') {
-			dec3[cnt++] = (*s2 - '0');
-			if (cnt == 3) {
+			dig += (*s2 - '0') * n10;
+			cnt++;
+			n10 *= 10;
+			if (cnt == 9) {
+				*dig32++ = dig;
 				cnt = 0;
-				d3_fill(dec3, &dig32, &ptr);
+				dig = 0;
+				n10 = 1;
 			}
 		}
 		s2--;
 	}
 	/* Partial digits at MSB */
-	if (cnt) {
-		while (cnt < 3)
-			dec3[cnt++] = 0;
-		d3_fill(dec3, &dig32, &ptr);
-	}
+	if (cnt)
+		*dig32 = dig;
 
 	return ret;
 }
@@ -155,8 +145,19 @@ int tt_apn_from_string(struct tt_apn *apn, const char *str)
 	apn->_exp = _exp + adjexp;
 
 	/* Rounding */
-	if (adjrnd)
-		_tt_apn_round_adj(apn);
+	if (adjrnd) {
+		uint one = 1;
+		struct tt_apn apn_1 = {
+			._sign = apn->_sign,
+			._inf_nan = 0,
+			._exp = apn->_exp,
+			._prec = 1,
+			._digsz = sizeof(one),
+			._msb = 1,
+			._dig32 = &one,
+		};
+		tt_apn_add(apn, apn, &apn_1);
+	}
 
 	/* Check zero */
 	if (_tt_apn_is_zero(apn) && apn->_exp > 0)
@@ -234,56 +235,26 @@ int tt_apn_to_string(const struct tt_apn *apn, char *str, uint len)
 
 	/* Get valid uints */
 	int uints = (apn->_msb + 8) / 9;
-	/* Point to first 3-decimals */
-	int ptr = apn->_msb - (uints - 1) * 9;
-	tt_assert(ptr >= 1 && ptr <= 9);
-	ptr--;
-	ptr /= 3;
-	ptr *= 11;
 
 	/* Generate coefficient */
-	bool first = true;
-	uint bit10;
+	bool skip0 = true;
 	const uint *dig32 = apn->_dig32 + uints - 1;
 	int digs = 0;
 	while (digs < apn->_msb) {
-		/* Cut 10 bits: ptr ~ ptr+9 */
-		bit10 = (*dig32) >> ptr;
-		bit10 &= 0x3FF;
-		ptr -= 11;
-		if (ptr < 0) {
-			ptr = 22;
-			dig32--;
-		}
+		/* Change to 9 decimals */
+		uchar dec9[9];
+		_tt_apn_to_d9(*dig32, dec9);
+		dig32--;
 
-		/* Change to 3 decimals */
-		const uchar *dec3 = _tt_apn_to_d3(bit10);
-		if (first) {
-			/* Skip leading 0 */
-			if (dec3[2]) {
-				*str++ = dec3[2] + '0';
-				if (++digs == ptpos)
-					*str++ = '.';
-				*str++ = dec3[1] + '0';
-				if (++digs == ptpos)
-					*str++ = '.';
-			} else if (dec3[1]) {
-				*str++ = dec3[1] + '0';
-				if (++digs == ptpos)
-					*str++ = '.';
-			}
-			first = false;
-		} else {
-			*str++ = dec3[2] + '0';
-			if (++digs == ptpos)
-				*str++ = '.';
-			*str++ = dec3[1] + '0';
+		for (int i = 8; i >= 0; i--) {
+			if (skip0 && dec9[i] == 0 && i)
+				continue;
+			else
+				skip0 = false;
+			*str++ = dec9[i] + '0';
 			if (++digs == ptpos)
 				*str++ = '.';
 		}
-		*str++ = dec3[0] + '0';
-		if (++digs == ptpos)
-			*str++ = '.';
 	}
 	tt_assert(digs == apn->_msb);
 

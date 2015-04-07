@@ -438,6 +438,30 @@ static void verify_mul(int count)
 	tt_log_set_level(old_level);
 }
 
+/* Factorial with divide and conque approach */
+struct tt_apn *factorial(int i, int j)
+{
+	struct tt_apn *apn;
+
+	if (i == j) {
+		apn = tt_apn_alloc(0);
+		tt_apn_from_uint(apn, i);
+		return apn;
+	}
+
+	int m = (i + j) / 2;
+	struct tt_apn *apn1 = factorial(i, m);
+	struct tt_apn *apn2 = factorial(m+1, j);
+
+	apn = tt_apn_alloc(apn1->_prec + apn2->_prec);
+	tt_apn_mul(apn, apn1, apn2);
+
+	tt_apn_free(apn1);
+	tt_apn_free(apn2);
+
+	return apn;
+}
+
 int main(void)
 {
 #if 0
@@ -531,6 +555,16 @@ int main(void)
 				printf("%s\n", s);
 		}
 	}
+#endif
+
+#if 0
+	int old_level = tt_log_set_level(TT_LOG_WARN);
+	struct tt_apn *apn_fac = factorial(1, 100000);
+	char s_fac[500000];
+	tt_apn_to_string(apn_fac, s_fac, 500000);
+	tt_apn_free(apn_fac);
+	printf("100000! = %s\n", s_fac);
+	tt_log_set_level(old_level);
 #endif
 
 	srand(time(NULL));

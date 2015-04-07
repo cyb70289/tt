@@ -11,6 +11,11 @@
 
 #pragma GCC diagnostic ignored "-Wunused-variable"
 
+/* 10^n, n = 0 ~ 8 */
+static const uint one_tbl[] = {
+	1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,
+};
+
 /* Get MSB of dig[0] ~ dig[uints-1] */
 static int get_msb(const uint *dig, const int uints)
 {
@@ -20,12 +25,11 @@ static int get_msb(const uint *dig, const int uints)
 		uint u = dig[i];
 		if (u) {
 			msb = i * 9;
-			if ((u >> 22))
-				msb += (_tt_digits(u >> 22) + 6);
-			else if ((u >> 11) & 0x3FF)
-				msb += (_tt_digits((u >> 11) & 0x3FF) + 3);
-			else
-				msb += _tt_digits(u & 0x3FF);
+			do {
+				msb++;
+				u /= 10;
+			} while (u);
+
 			break;
 		}
 	}
@@ -33,39 +37,24 @@ static int get_msb(const uint *dig, const int uints)
 	return msb;
 }
 
-/* Add two uint(9 digit decimals) and re-arrange
- * - carry: input: carry bit of top 3 digits of lower uint
- * - carry: output: carry bit of top 3 digits of this uint
- * return arranged digit
+/* Add two uint(9 digit decimals)
+ * - carry: input: 0, 1
+ * - carry: output: 1 => sum > 999,999,999
+ * return adjust digit
  */
 static uint add_dig(uint dig, uint dig2, char *carry)
 {
-	dig = _tt_add_uint(dig + *carry, dig2, carry);
-
-	/* Split to 3-digit sets */
-	uint xdig[3];	/* Extended digit with 11 bits */
-	xdig[0] = dig & 0x7FF;
-	xdig[1] = (dig >> 11) & 0x7FF;
-	xdig[2] = dig >> 22;
-	if (*carry)
-		xdig[2] |= BIT(10);
+	dig += (dig2 + *carry);
 
 	/* Check overflow */
-	if (xdig[0] > 999) {
-		xdig[0] -= 1000;
-		xdig[1]++;
-	}
-	if (xdig[1] > 999) {
-		xdig[1] -= 1000;
-		xdig[2]++;
-	}
-	if (xdig[2] > 999) {
-		xdig[2] -= 1000;
+	if (dig >= 1000000000) {
+		dig -= 1000000000;
 		*carry = 1;
+	} else {
+		*carry = 0;
 	}
 
-	/* Combine to one uint */
-	return (xdig[2] << 22) | (xdig[1] << 11) | xdig[0];
+	return dig;
 }
 
 /* dig += dig2
@@ -99,68 +88,37 @@ static int add_digs(uint *dig, const int msb, const uint *dig2, const int msb2)
 		dig[i] = 1;
 		return _tt_max(msb, msb2) + 1;
 	} else {
-		/* i => valid uints */
+		/* Get new msb, i => valid uints */
 		tt_assert_fa(i > 0);
 		uint u = dig[i-1];
-		/* Get new msb */
 		int msbr = (i - 1) * 9;
-		if ((u >> 22))
-			msbr += (_tt_digits(u >> 22) + 6);
-		else if ((u >> 11) & 0x3FF)
-			msbr += (_tt_digits((u >> 11) & 0x3FF) + 3);
-		else
-			msbr += _tt_digits(u & 0x3FF);
+		do {
+			msbr++;
+			u /= 10;
+		} while (u);
+
 		const int msbs = _tt_max(msb, msb2);
 		tt_assert_fa(msbr == msbs || msbr == (msbs+1));
 		return msbr;
 	}
 }
 
-/* Sub two uint(9 digit decimals) and re-arrange
- * - carry: input: carry bit of top 3 digits of lower uint
- * - carry: output: carry bit of top 3 digits of this uint
- * return arranged digit
+/* Sub two uint(9 digit decimals)
+ * - carry: input: 0, 1
+ * - carry: output: 1 => sub < 0
+ * return adjust digit
  */
 static uint sub_dig(uint dig, uint dig2, char *carry)
 {
-	dig |= (BIT(10) | BIT(21));
-	dig = _tt_sub_uint(dig - *carry, dig2, carry);
-
-	/* Split to 3-digit sets */
-	uint xdig[3];	/* Extended digit with 11 bits */
-	xdig[0] = dig & 0x7FF;
-	xdig[1] = (dig >> 11) & 0x7FF;
-	xdig[2] = dig >> 22;
-	if (*carry) {
-		xdig[2] = ~xdig[2];
-		xdig[2] &= 0x3FF;
-		xdig[2] = 1023 - xdig[2];
-	} else {
-		xdig[2] += 1024;
-	}
-
-	/* Check underflow */
-	if (xdig[0] < 1024) {
-		xdig[0] -= 24;
-		xdig[1]--;
-	} else {
-		xdig[0] -= 1024;
-	}
-	if (xdig[1] < 1024) {
-		xdig[1] -= 24;
-		xdig[2]--;
-	} else {
-		xdig[1] -= 1024;
-	}
-	if (xdig[2] < 1024) {
-		xdig[2] -= 24;
+	int sub = dig - dig2 - *carry;
+	if (sub < 0) {
+		sub += 1000000000;
 		*carry = 1;
 	} else {
-		xdig[2] -= 1024;
+		*carry = 0;
 	}
 
-	/* Combine to one uint */
-	return (xdig[2] << 22) | (xdig[1] << 11) | xdig[0];
+	return sub;
 }
 
 /* dig = dig1 - dig2
@@ -197,27 +155,11 @@ static int sub_digs(uint *dig, const uint *dig1, const int msb1,
 	return msbr;
 }
 
-/* Multiply two 9 digit decimal
- * - dec1,2 in decimal format
- * - return binary format
- */
-static uint64_t mul_dec9(uint dec1, uint dec2)
-{
-	uint64_t bin1 = (dec1 >> 22) * 1000000;
-	bin1 += ((dec1 >> 11) & 0x3FF) * 1000;
-	bin1 += dec1 & 0x3FF;
-
-	uint64_t bin2 = (dec2 >> 22) * 1000000;
-	bin2 += ((dec2 >> 11) & 0x3FF) * 1000;
-	bin2 += dec2 & 0x3FF;
-
-	return bin1 * bin2;
-}
-
 /* *dig += ui64 * 10^(9*shift)
  * - ui64 in binary format
  * - *dig in decimal format
  * - shift: offset in uints, >= 0
+ * - return MSB
  */
 static int shift_add_u64(uint *dig, int msb, uint64_t ui64, int shift)
 {
@@ -254,7 +196,7 @@ static int mul_digs(uint *digr, const uint *dig1, const int msb1,
 		uint64_t tmp64 = 0;
 		int cnt = 0;
 		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++) {
-			tmp64 += mul_dec9(dig1[j], dig2[k]);
+			tmp64 += (uint64_t)dig1[j] * dig2[k];
 			cnt++;
 			if (cnt == 10) {
 				/* Consume before tmp64 overflow */
@@ -298,45 +240,23 @@ static int cmp_digs(const uint *dig1, const int msb1,
 }
 
 /* Left shift adj digits
- * - adj = 1, 2
+ * - adj = 1~8
  * - return shifted value
  */
-static uint lshift_dig12(uint dig32, int adj)
+static uint lshift_dig_1_8(uint dig32, int adj)
 {
-	uchar d[9];
-	_tt_apn_to_d3_cp(dig32 & 0x3FF, d);
-	_tt_apn_to_d3_cp((dig32 >> 11) & 0x3FF, d+3);
-	_tt_apn_to_d3_cp(dig32 >> 22, d+6);
-
-	int i;
-	for (i = 8; i >= adj; i--)
-		d[i] = d[i-adj];
-	while (i >= 0)
-		d[i--] = 0;
-
-	return (_tt_apn_from_d3(d+6) << 22) | (_tt_apn_from_d3(d+3) << 11) |
-		_tt_apn_from_d3(d);
+	uint64_t dig64 = dig32;
+	dig64 *= one_tbl[adj];
+	return dig64 % 1000000000;
 }
 
 /* Right shift adj digits
- * - adj = 1, 2
+ * - adj = 1~8
  * - retrun shifted value
  */
-static uint rshift_dig12(uint dig32, int adj)
+static uint rshift_dig_1_8(uint dig32, int adj)
 {
-	uchar d[9];
-	_tt_apn_to_d3_cp(dig32 & 0x3FF, d);
-	_tt_apn_to_d3_cp((dig32 >> 11) & 0x3FF, d+3);
-	_tt_apn_to_d3_cp(dig32 >> 22, d+6);
-
-	int i;
-	for (i = 0; i < 9-adj; i++)
-		d[i] = d[i+adj];
-	while (i < 9)
-		d[i++] = 0;
-
-	return (_tt_apn_from_d3(d+6) << 22) | (_tt_apn_from_d3(d+3) << 11) |
-		_tt_apn_from_d3(d);
+	return dig32 / one_tbl[adj];
 }
 
 /* Shift "src" adj digits and copy to "dst"
@@ -376,8 +296,6 @@ static int shift_digs(uint *dst, uint dst_sz, const uint *src, int msb, int adj)
 	/* Shift */
 	int adj9 = adj / 9;	/* Align to uint */
 	adj %= 9;
-	int adj3 = adj / 3;	/* Align to 10bit */
-	adj %= 3;
 	int i;
 	const uint *cur = src;	/* Current digit buffer */
 	if (append0) { /* Left shift */
@@ -393,30 +311,8 @@ static int shift_digs(uint *dst, uint dst_sz, const uint *src, int msb, int adj)
 			cur = dst;
 		}
 
-		/* Align-3 */
-		if (adj3) {	/* adj3 = 1, 2 */
-			/* Check 3-digit sets in first uint */
-			int u1_dig3 = (msb - 1) % 9 + 1;
-			u1_dig3 += 2;
-			u1_dig3 /= 3;	/* 1, 2, 3 */
-			if ((u1_dig3 + adj3) > 3)
-				uints++;
-			msb += adj3 * 3;
-
-			/* Shift left */
-			static const int sfl_bits[] = { 11, 22 };
-			static const int sfr_bits[] = { 22, 11 };
-			for (i = uints-1; i > 0; i--) {
-				dst[i] = cur[i] << sfl_bits[adj3-1];
-				dst[i] |= cur[i-1] >> sfr_bits[adj3-1];
-			}
-			dst[0] = cur[0] << sfl_bits[adj3-1];
-
-			cur = dst;
-		}
-
 		/* Unaligned */
-		if (adj) {	/* adj = 1, 2 */
+		if (adj) {	/* adj = 1~8 */
 			/* Check digits in first uint */
 			int u1_dig = (msb - 1) % 9 + 1;
 			if ((u1_dig + adj) > 9)
@@ -425,15 +321,11 @@ static int shift_digs(uint *dst, uint dst_sz, const uint *src, int msb, int adj)
 
 			/* Shift left */
 			for (i = uints-1; i > 0; i--) {
-				dst[i] = lshift_dig12(cur[i], adj);
+				dst[i] = lshift_dig_1_8(cur[i], adj);
 				/* Append msb of lower uint */
-				const uchar *d = _tt_apn_to_d3(cur[i-1] >> 22);
-				if (adj == 1)
-					dst[i] += d[2];
-				else
-					dst[i] += (d[2] * 10 + d[1]);
+				dst[i] += cur[i-1] / one_tbl[9-adj];
 			}
-			dst[0] = lshift_dig12(cur[0], adj);
+			dst[0] = lshift_dig_1_8(cur[0], adj);
 		}
 	} else { /* Right shift */
 		/* Align-9 */
@@ -450,43 +342,16 @@ static int shift_digs(uint *dst, uint dst_sz, const uint *src, int msb, int adj)
 			cur = dst;
 		}
 
-		/* Align-3 */
-		if (adj3) {	/* adj3 = 1, 2 */
-			/* Shift right */
-			static const int sfl_bits[] = { 22, 11 };
-			static const int sfr_bits[] = { 11, 22 };
-			for (i = 0; i < uints-1; i++) {
-				dst[i] = cur[i] >> sfr_bits[adj3-1];
-				dst[i] |= cur[i+1] << sfl_bits[adj3-1];
-			}
-			dst[uints-1] = cur[uints-1] >> sfr_bits[adj3-1];
-
-			cur = dst;
-
-			/* Check 3-digit sets in first uint */
-			int u1_dig3 = (msb - 1) % 9 + 1;
-			u1_dig3 += 2;
-			u1_dig3 /= 3;	/* 1, 2, 3 */
-			if (u1_dig3 <= adj3)
-				uints--;
-			msb -= adj3 * 3;
-		}
-
 		/* Unaligned */
-		if (adj) {	/* adj = 1, 2 */
+		if (adj) {	/* adj = 1~8 */
 			/* Shift right */
 			for (i = 0; i < uints - 1; i++) {
-				dst[i] = rshift_dig12(cur[i], adj);
+				dst[i] = rshift_dig_1_8(cur[i], adj);
 				/* Prepend lsb of higher uint */
-				const uchar *d = _tt_apn_to_d3(cur[i+1] & 0x3FF);
-				uint a;
-				if (adj == 1)
-					a = ((uint)d[0]) * 100;
-				else
-					a = ((uint)d[1]) * 100 + d[0] * 10;
-				dst[i] += a << 22;
+				dst[i] += (cur[i+1] % one_tbl[adj]) *
+					one_tbl[9-adj];
 			}
-			dst[uints-1] = rshift_dig12(cur[uints-1], adj);
+			dst[uints-1] = rshift_dig_1_8(cur[uints-1], adj);
 
 			/* Check digits in first uint */
 			int u1_dig = (msb - 1) % 9 + 1;
@@ -499,13 +364,6 @@ static int shift_digs(uint *dst, uint dst_sz, const uint *src, int msb, int adj)
 	tt_assert_fa(msb_r == msb);
 	return msb;
 }
-
-/* 10^n, n = 0 ~ 8 */
-static const uint one_tbl[] = {
-	1, 10, 100,
-	1U << 11, 10U << 11, 100U << 11,
-	1U << 22, 10U << 22, 100U << 22,
-};
 
 /* dst = src1 +/- src2
  * - sub: 0 -> add, 1 -> sub
