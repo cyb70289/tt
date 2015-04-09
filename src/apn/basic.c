@@ -155,13 +155,25 @@ static int sub_digs(uint *dig, const uint *dig1, const int msb1,
 	return msbr;
 }
 
-/* *dig += ui64 * 10^(9*shift)
- * - ui64 in binary format
+/* *dig += ui * 10^(9*shift)
+ * - ui in binary format
  * - *dig in decimal format
  * - shift: offset in uints, >= 0
  * - return MSB
  */
-static int shift_add_u64(uint *dig, int msb, uint64_t ui64, int shift)
+#ifdef __SIZEOF_INT128__
+static inline int shift_add_u128(uint *dig, int msb, __uint128_t ui128,
+		int shift)
+{
+	/* Convert *ui128 to decimal */
+	uint dec[5] = { 0, 0, 0, 0, 0 };
+	int msb2 = _tt_apn_uint128_to_dec(dec, ui128);
+
+	/* Add dec[] to &dig[shift] */
+	return add_digs(dig+shift, msb-shift*9, dec, msb2) + shift*9;
+}
+#else
+static inline int shift_add_u64(uint *dig, int msb, uint64_t ui64, int shift)
 {
 	/* Convert ui64 to decimal */
 	uint dec[3] = { 0, 0, 0 };
@@ -170,6 +182,7 @@ static int shift_add_u64(uint *dig, int msb, uint64_t ui64, int shift)
 	/* Add dec[] to &dig[shift] */
 	return add_digs(dig+shift, msb-shift*9, dec, msb2) + shift*9;
 }
+#endif
 
 /* digr = dig1 * dig2
  * - msb: digit length, > 0
@@ -193,6 +206,16 @@ static int mul_digs(uint *digr, const uint *dig1, const int msb1,
 		if (jmin < 0)
 			jmin = 0;
 
+#ifdef __SIZEOF_INT128__
+		/* uint128 may overflow if both dig are longer than
+		 * 9 * 10^20 digits. I don't think it's possible.
+		 */
+		__uint128_t tmp128 = 0;
+		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++)
+			tmp128 += (uint64_t)dig1[j] * dig2[k];
+		if (tmp128)
+			msb = shift_add_u128(digr, msb, tmp128, i);
+#else
 		uint64_t tmp64 = 0;
 		int cnt = 0;
 		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++) {
@@ -207,6 +230,7 @@ static int mul_digs(uint *digr, const uint *dig1, const int msb1,
 		}
 		if (cnt)
 			msb = shift_add_u64(digr, msb, tmp64, i);
+#endif
 	}
 
 	tt_assert_fa(msb >= msb1 && msb <= (msb1 + msb2));
@@ -243,7 +267,7 @@ static int cmp_digs(const uint *dig1, const int msb1,
  * - adj = 1~8
  * - return shifted value
  */
-static uint lshift_dig_1_8(uint dig32, int adj)
+static inline uint lshift_dig_1_8(uint dig32, int adj)
 {
 	uint64_t dig64 = dig32;
 	dig64 *= one_tbl[adj];
@@ -254,7 +278,7 @@ static uint lshift_dig_1_8(uint dig32, int adj)
  * - adj = 1~8
  * - retrun shifted value
  */
-static uint rshift_dig_1_8(uint dig32, int adj)
+static inline uint rshift_dig_1_8(uint dig32, int adj)
 {
 	return dig32 / one_tbl[adj];
 }

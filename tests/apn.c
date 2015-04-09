@@ -565,6 +565,7 @@ int main(void)
 	tt_apn_free(apn_fac);
 	printf("100000! = %s\n", s_fac);
 	tt_log_set_level(old_level);
+	return 0;
 #endif
 
 	srand(time(NULL));

@@ -144,3 +144,35 @@ int _tt_apn_uint_to_dec(uint *dig32, uint64_t num)
 
 	return msb;
 }
+
+/* Convert uint128 to decimal
+ * - dig must be zeroed
+ * - return MSB
+ */
+#ifdef __SIZEOF_INT128__
+int _tt_apn_uint128_to_dec(uint *dig32, __uint128_t num)
+{
+	int msb = 1;
+	if (num)
+		msb = 0;	/* Compensate "0" */
+
+	while (num) {
+		/* Get 9 decimals */
+		uint dec9 = num % 1000000000;
+		num /= 1000000000;
+
+		*dig32++ = dec9;
+
+		/* Increment significand */
+		if (num)
+			msb += 9;
+		else
+			do {
+				msb++;
+				dec9 /= 10;
+			} while (dec9);
+	}
+
+	return msb;
+}
+#endif

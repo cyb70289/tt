@@ -69,5 +69,6 @@ static inline void _tt_apn_to_d9(uint dig, uchar *d)
 /* Get "pos-th" digit (pos starts from 0) */
 uint _tt_apn_get_dig(const uint *dig, int pos);
 
-/* uint64 -> decimal */
+/* uint64/128 -> decimal */
 int _tt_apn_uint_to_dec(uint *dig32, uint64_t num);
+int _tt_apn_uint128_to_dec(uint *dig32, __uint128_t num);
