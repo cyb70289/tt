@@ -19,7 +19,7 @@
  *
  * in, out: [real1, image1, real2, image2, ..., realN, imageN]
  */
-int tt_dft(double (*in)[2], double (*out)[2], int N)
+int tt_dft(double (*out)[2], double (*in)[2], int N)
 {
 	tt_assert(N);
 
@@ -32,7 +32,7 @@ int tt_dft(double (*in)[2], double (*out)[2], int N)
 		for (int n = 0; n < N; n++) {
 			double e[2] = { cos(emn), -sin(emn) };
 			double t[2];
-			tt_complex_mul(in[n], e, t);
+			tt_complex_mul(t, in[n], e);
 			out[m][0] += t[0];
 			out[m][1] += t[1];
 
@@ -55,7 +55,7 @@ int tt_dft(double (*in)[2], double (*out)[2], int N)
  *
  * in, out: [real1, image1, real2, image2, ..., realN, imageN]
  */
-int tt_idft(double (*in)[2], double (*out)[2], int N)
+int tt_idft(double (*out)[2], double (*in)[2], int N)
 {
 	tt_assert(N);
 
@@ -68,7 +68,7 @@ int tt_idft(double (*in)[2], double (*out)[2], int N)
 		for (int m = 0; m < N; m++) {
 			double e[2] = { cos(enm), sin(enm) };
 			double t[2];
-			tt_complex_mul(in[m], e, t);
+			tt_complex_mul(t, in[m], e);
 			out[n][0] += t[0];
 			out[n][1] += t[1];
 

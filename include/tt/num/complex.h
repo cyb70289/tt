@@ -7,8 +7,8 @@
 /* Multiply
  * - Input and output may share same buffer
  */
-static void tt_complex_mul(const double *in1, const double *in2,
-		double *out)
+static inline void tt_complex_mul(double *out,
+		const double *in1, const double *in2)
 {
 	double r = in1[0] * in2[0] - in1[1] * in2[1];
 	double i = in1[0] * in2[1] + in1[1] * in2[0];

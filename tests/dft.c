@@ -44,13 +44,13 @@ int main(void)
 	};
 	double out[8][2];
 
-	tt_dft(in, out, 8);
+	tt_dft(out, in, 8);
 
 	printf("DFT:\n");
 	for (int i = 0; i < 8; i++)
 		printf("%.4f + %.4fj\n", out[i][0], out[i][1]);
 
-	tt_idft(out, in, 8);
+	tt_idft(in, out, 8);
 
 	printf("\nIDFT:\n");
 	for (int i = 0; i < 8; i++)
@@ -61,7 +61,7 @@ int main(void)
 	sample_sine(1000, 5000, 32, sample);	/* 32 / (5000 / 1000) = 6.2 */
 
 	double dft[32][2];
-	tt_dft(sample, dft, 32);
+	tt_dft(dft, sample, 32);
 
 	double max = 0, mag[32];
 	for (int i = 0; i < 32; i++) {
@@ -81,7 +81,7 @@ int main(void)
 
 	printf("\nSINC(5 ones):\n");
 	sample_rect(5, 32, sample);
-	tt_dft(sample, dft, 32);
+	tt_dft(dft, sample, 32);
 
 	max = 0;
 	for (int i = 0; i < 32; i++) {

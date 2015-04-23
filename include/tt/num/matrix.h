@@ -12,10 +12,10 @@ struct tt_mtx {
 };
 
 /* Matrix multiplication
- * [mi1] * [mi2] = [mo]
+ * [mo] = [mi1] * [mi2]
  */
-int tt_mtx_mul(const struct tt_mtx *mi1, const struct tt_mtx *mi2,
-		struct tt_mtx *mo);
+int tt_mtx_mul(struct tt_mtx *mo,
+		const struct tt_mtx *mi1, const struct tt_mtx *mi2);
 
 /* Gauss-Jordan elimination
  * - Resolve linear equations: [ma].[x] = [mb]

@@ -47,7 +47,7 @@ int main(void)
 	b2.rows = 6;
 	double vb2[6];
 	b2.v = vb2;
-	tt_mtx_mul(&m, &b, &b2);
+	tt_mtx_mul(&b2, &m, &b);
 	for (i = 0; i < 6; i++)
 		printf("%f, ", b2.v[i]);
 	printf("\n");

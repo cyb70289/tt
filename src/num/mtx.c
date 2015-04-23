@@ -8,14 +8,14 @@
 #include "mtx.h"
 
 /* Naive implementation of matrix multiplication
- * [mi1] * [mi2] = mo
+ * [mo] = [mi1] * [mi2]
  * Algorithm complexity
  * - Space: O(1)
  * - Time: O(n^3)
  * TODO: optimization
  */
-int tt_mtx_mul(const struct tt_mtx *mi1, const struct tt_mtx *mi2,
-		struct tt_mtx *mo)
+int tt_mtx_mul(struct tt_mtx *mo,
+		const struct tt_mtx *mi1, const struct tt_mtx *mi2)
 {
 	tt_assert(mi1->cols == mi2->rows);
 	tt_assert(mo->rows == mi1->rows);
