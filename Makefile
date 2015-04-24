@@ -50,7 +50,7 @@ CLEAN_FILES	:=
 # Compiler flags
 CPPFLAGS	+= -g -O2 -fno-strict-aliasing
 CPPFLAGS	+= -I$(TOPDIR)/include -I$(TOPDIR)/src
-CFLAGS		+= -Wall -Werror -Wstrict-prototypes -std=gnu99
+CFLAGS		+= -Wall -Wstrict-prototypes -std=gnu99
 AFLAGS		+= -I$(TOPDIR)/include
 
 # Extra libraries
