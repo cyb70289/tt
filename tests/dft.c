@@ -6,6 +6,8 @@
 #include <tt/num/dft.h>
 
 #include <math.h>
+#include <time.h>
+#include <string.h>
 
 static void sample_sine(double freq, double rate, int N, double (*s)[2])
 {
@@ -44,13 +46,13 @@ int main(void)
 	};
 	double out[8][2];
 
-	tt_dft(out, in, 8);
+	tt_fft(out, in, 8);
 
 	printf("DFT:\n");
 	for (int i = 0; i < 8; i++)
 		printf("%.4f + %.4fj\n", out[i][0], out[i][1]);
 
-	tt_idft(in, out, 8);
+	tt_ifft(in, out, 8);
 
 	printf("\nIDFT:\n");
 	for (int i = 0; i < 8; i++)
@@ -61,7 +63,7 @@ int main(void)
 	sample_sine(1000, 5000, 32, sample);	/* 32 / (5000 / 1000) = 6.2 */
 
 	double dft[32][2];
-	tt_dft(dft, sample, 32);
+	tt_fft(dft, sample, 32);
 
 	double max = 0, mag[32];
 	for (int i = 0; i < 32; i++) {
@@ -81,7 +83,7 @@ int main(void)
 
 	printf("\nSINC(5 ones):\n");
 	sample_rect(5, 32, sample);
-	tt_dft(dft, sample, 32);
+	tt_fft(dft, sample, 32);
 
 	max = 0;
 	for (int i = 0; i < 32; i++) {
@@ -99,6 +101,25 @@ int main(void)
 		putchar('\n');
 	};
 
+	/* Compare DFT, FFT */
+	double x[8192][2], X[8192][2];
+
+	srand(time(NULL));
+	for (int i = 0; i < 8192; i++) {
+		x[i][0] = rand() % 1000;
+		x[i][1] = rand() % 1000;
+
+	}
+
+	printf("8192 Points FFT...\n");
+	clock_t t = clock();
+	tt_fft(X, x, 8192);
+	printf("Done in %u ms\n", (uint)(clock() - t) / 1000);
+
+	printf("8192 Points DFT...\n");
+	t = clock();
+	tt_dft(X, x, 8192);
+	printf("Done in %u ms\n", (uint)(clock() - t) / 1000);
 
 	return 0;
 }
