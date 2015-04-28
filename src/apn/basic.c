@@ -59,7 +59,7 @@ static uint add_dig(uint dig, uint dig2, char *carry)
 
 /* dig += dig2
  * - msb: digit length, may <= 0
- * - dig must have enouth space to hold result(include possible carry)
+ * - dig must have enough space to hold result(include possible carry)
  * - return result digit length
  */
 static int add_digs(uint *dig, const int msb, const uint *dig2, const int msb2)
@@ -124,7 +124,7 @@ static uint sub_dig(uint dig, uint dig2, char *carry)
 /* dig = dig1 - dig2
  * - dig1 >= dig2
  * - msb: digit length, may <= 0
- * - dig must have enouth space to hold result
+ * - dig must have enough space to hold result
  * - dig may share buffer with dig1 or dig2
  * - dig must be zeroed if not shared with dig1 or dig2
  * - return result digit length
@@ -187,7 +187,7 @@ static inline int shift_add_u64(uint *dig, int msb, uint64_t ui64, int shift)
 /* digr = dig1 * dig2
  * - msb: digit length, > 0
  * - dig1, dig2 are not zero
- * - digr must have enouth space to hold result
+ * - digr must have enough space to hold result
  * - digr is zeroed
  * - return result digit length
  */

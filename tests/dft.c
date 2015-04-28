@@ -4,6 +4,7 @@
  */
 #include <tt/tt.h>
 #include <tt/num/dft.h>
+#include <tt/num/complex.h>
 
 #include <math.h>
 #include <time.h>
@@ -44,11 +45,18 @@ int main(void)
 		{ -1.3535, 0 },
 		{ -0.3535, 0 },
 	};
+
 	double out[8][2];
-
 	tt_fft(out, in, 8);
-
 	printf("DFT:\n");
+	for (int i = 0; i < 8; i++)
+		printf("%.4f + %.4fj\n", out[i][0], out[i][1]);
+
+	double in2[8];
+	for (int i = 0; i < 8; i++)
+		in2[i] = in[i][0];
+	tt_fft_real(out, in2, 8);
+	printf("\nDFT(real):\n");
 	for (int i = 0; i < 8; i++)
 		printf("%.4f + %.4fj\n", out[i][0], out[i][1]);
 
@@ -101,25 +109,45 @@ int main(void)
 		putchar('\n');
 	};
 
-	/* Compare DFT, FFT */
-	double x[8192][2], X[8192][2];
-
-	srand(time(NULL));
-	for (int i = 0; i < 8192; i++) {
-		x[i][0] = rand() % 1000;
-		x[i][1] = rand() % 1000;
-
+#if 0
+	/* FFT fast multiplication */
+	uint ai = 12345678, bi = 87654321;
+	double a[4] = { ai & 0xFFFF, ai >> 16, 0 , 0 };
+	double b[4] = { bi & 0xFFFF, bi >> 16, 0 , 0 };
+	double c[4][2];
+	double A[4][2], B[4][2], C[4][2];
+	tt_fft_real(A, a, 4);
+	tt_fft_real(B, b, 4);
+	for (int i = 0; i < 4; i++)
+		tt_complex_mul(C[i], A[i], B[i]);
+	tt_ifft(c, C, 4);
+	printf("%u * %u = ", ai, bi);
+	for (int i = 2; i >= 0; i--) {
+		printf("(%.0f << %d)", c[i][0], 16 * i);
+		if (i)
+			printf(" + ");
 	}
+	printf("\n");
+#endif
 
-	printf("8192 Points FFT...\n");
-	clock_t t = clock();
-	tt_fft(X, x, 8192);
-	printf("Done in %u ms\n", (uint)(clock() - t) / 1000);
-
-	printf("8192 Points DFT...\n");
-	t = clock();
-	tt_dft(X, x, 8192);
-	printf("Done in %u ms\n", (uint)(clock() - t) / 1000);
+#if 0
+	/* FFT rounding error */
+	#define N	1024
+	double a[N*2], b[N*2], c[N*2][2];
+	double A[N*2][2], B[N*2][2], C[N*2][2];
+	for (int i = 0; i < N; i++)
+		a[i] = b[i] = 65535;
+	for (int i = N; i < N*2; i++)
+		a[i] = b[i] = 0;
+	tt_fft_real(A, a, N*2);
+	tt_fft_real(B, b, N*2);
+	for (int i = 0; i < N*2; i++)
+		tt_complex_mul(C[i], A[i], B[i]);
+	tt_ifft(c, C, N*2);
+	for (int i = 0; i < N*2; i++)
+		if (fabs(c[i][1]) >  0.4)
+			printf("%f %f\n", c[i][0], c[i][1]);
+#endif
 
 	return 0;
 }

@@ -56,3 +56,6 @@ int _tt_atoi(const char *str, int *i);
 
 /* Rounding */
 int _tt_round(int odd, uint dig, int rnd);
+
+/* Bit reversal */
+uint _tt_bitrev(uint n, int bits);

@@ -1,4 +1,4 @@
-/* Non-optimized DFT & IDFT
+/* DFT & IDFT (Naive implementation)
  *
  * Copyright (C) 2014 Yibo Cai
  */
@@ -78,6 +78,30 @@ int tt_idft(double (*out)[2], double (*in)[2], uint N)
 		out[n][1] /= N;
 
 		en += edelta;
+	}
+
+	return 0;
+}
+
+/* in: [real1, real2, ..., realN] */
+int tt_dft_real(double (*out)[2], const double *in, uint N)
+{
+	tt_assert(N);
+
+	double em = 0;
+	double edelta = 2 * _TT_PI / N;
+	for (uint m = 0; m < N; m++) {
+		out[m][0] = out[m][1] = 0;
+
+		double emn = 0;
+		for (uint n = 0; n < N; n++) {
+			out[m][0] += cos(emn) * in[n];
+			out[m][1] += -sin(emn) * in[n];
+
+			emn += em;
+		}
+
+		em += edelta;
 	}
 
 	return 0;

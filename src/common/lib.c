@@ -51,3 +51,25 @@ int _tt_atoi(const char *str, int *i)
 	*i = atoi(str);
 	return 0;
 }
+
+/* Bit reversal
+ * - 1 <= bits <= 31
+ * - http://www.katjaas.nl/bitreversal/bitreversal.html
+ */
+uint _tt_bitrev(uint n, int bits)
+{
+	uint rev = n;
+	uint cnt = bits - 1;
+	uint N = 1 << bits;
+
+	for (n >>= 1; n; n >>= 1) {
+		rev <<= 1;
+		rev |= (n & 1);
+		cnt--;
+	}
+
+	rev <<= cnt;
+	rev &= (N - 1);
+
+	return rev;
+}

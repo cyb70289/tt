@@ -1,6 +1,6 @@
 /* Fast Fourier Transform
  *
- * Copyright (C) 2014 Yibo Cai
+ * Copyright (C) 2015 Yibo Cai
  */
 #include <tt/tt.h>
 #include <tt/num/dft.h>
@@ -47,28 +47,27 @@ static __attribute__ ((destructor)) void fft_deinit(void)
 	free(wn_ftbl);
 }
 
-/* Bit reversal
- * - 1 <= bits <= 31, N = 2^bits.
- * - http://www.katjaas.nl/bitreversal/bitreversal.html
- */
-static uint bit_reverse(uint n, int bits, uint N)
+/* TODO: keep lookup table for some time */
+static double (*get_wn_tbl(int N, int *delta))[2]
 {
-	uint rev = n;
-	uint cnt = bits - 1;
-
-	for (n >>= 1; n; n >>= 1) {
-		rev <<= 1;
-		rev |= (n & 1);
-		cnt--;
+	if (N > WN_PTS) {
+		tt_info("Points > %d, new lookup table created.", WN_PTS);
+		*delta = 1;
+		return gen_wn_tbl(N);
+	} else {
+		*delta = WN_PTS / N;
+		return wn_ftbl;
 	}
-
-	rev <<= cnt;
-	rev &= (N - 1);
-
-	return rev;
 }
 
-/* Evaluate FFT at each stage
+static void put_wn_tbl(double (*tbl)[2])
+{
+	if (tbl != wn_ftbl)
+		free(tbl);
+}
+
+/* Evaluate FFT at each stage (decimation in time)
+ *
  * stage1           stage2                  stage3...
  *---------o-----o-----------o-----------o------------
  *          \   /             \         /
@@ -94,7 +93,7 @@ static uint bit_reverse(uint n, int bits, uint N)
  *......
  */
 static void fft_stage(double (*x)[2], int stage, uint N,
-		double (*tbl)[2], int delta, bool inverse)
+		double (*tbl)[2], int delta)
 {
 	const int idx_step = 1 << (stage - 1);
 	int idx;
@@ -106,13 +105,7 @@ static void fft_stage(double (*x)[2], int stage, uint N,
 	for (int i = 0; i < (N >> stage); i++) {
 		int tbl_idx = 0;
 		for (int j = 0; j < idx_step; j++) {
-			if (inverse) {
-				tmp[0] = tbl[tbl_idx][0];
-				tmp[1] = -tbl[tbl_idx][1];
-				tt_complex_mul(x[idx], x[idx], tmp);
-			} else {
-				tt_complex_mul(x[idx], x[idx], tbl[tbl_idx]);
-			}
+			tt_complex_mul(x[idx], x[idx], tbl[tbl_idx]);
 			idx++;
 			tbl_idx += tbl_step;
 		}
@@ -132,60 +125,117 @@ static void fft_stage(double (*x)[2], int stage, uint N,
 	}
 }
 
-/* FFT: decimation in time
- * - in, out: [real1, image1, real2, image2, ..., realN, imageN]
- * - inverse: true - inverse fft
- * - TODO: keep lookup table for some time
- */
-static int fft(double (*out)[2], double (*in)[2], uint N, bool inverse)
+static void ifft_stage(double (*x)[2], int stage, uint N,
+		double (*tbl)[2], int delta)
 {
-	double (*tbl)[2] = wn_ftbl;
-	int delta = 1;
+	const int idx_step = 1 << (stage - 1);
+	int idx;
+	double tmp[2];
 
-	/* Check if N is 2^n */
-	if (N <= 1 || (N & (N-1))) {
-		tt_warn("%d is not power of 2, fallback to DFT", N);
-		return inverse ? tt_idft(in, out, N) : tt_dft(in, out, N);
+	const int tbl_step = delta * (N >> stage);
+	idx = idx_step;
+	for (int i = 0; i < (N >> stage); i++) {
+		int tbl_idx = 0;
+		for (int j = 0; j < idx_step; j++) {
+			tmp[0] = tbl[tbl_idx][0];
+			tmp[1] = -tbl[tbl_idx][1];
+			tt_complex_mul(x[idx], x[idx], tmp);
+			idx++;
+			tbl_idx += tbl_step;
+		}
+		idx += idx_step;
 	}
 
-	/* Generate lookup table if default one cannot fit */
-	if (N > WN_PTS) {
-		tt_info("Points > %d, new lookup table generated", WN_PTS);
-		tbl = gen_wn_tbl(N);
-		if (tbl == NULL)
-			return TT_ENOMEM;
-	} else {
-		delta = WN_PTS / N;
+	idx = 0;
+	for (int i = 0; i < (N >> stage); i++) {
+		for (int j = 0; j < idx_step; j++) {
+			tt_complex_add(tmp, x[idx], x[idx+idx_step]);
+			tt_complex_sub(x[idx+idx_step], x[idx], x[idx+idx_step]);
+			tt_complex_set(x[idx], tmp);
+			idx++;
+		}
+		idx += idx_step;
 	}
+}
+
+static int do_stage(double (*out)[2], double (*in)[2], uint N,
+		void (*stage)(double (*)[2], int, uint, double (*)[2], int))
+{
+	double (*tbl)[2];
+	int delta;
+
+	tbl = get_wn_tbl(N, &delta);
+	if (!tbl)
+		return TT_ENOMEM;
 
 	/* Bit reversal */
 	const int nb = __builtin_ctz(N);
 	for (int i = 0; i < N ; i++)
-		tt_complex_set(out[i], in[bit_reverse(i, nb, N)]);
+		tt_complex_set(out[i], in[_tt_bitrev(i, nb)]);
 
-	for (int stage = 1; stage <= nb; stage++)
-		fft_stage(out, stage, N, tbl, delta, inverse);
+	for (int i = 1; i <= nb; i++)
+		stage(out, i, N, tbl, delta);
 
-	if (tbl != wn_ftbl)
-		free(tbl);
-
-	/* Divide N if IFFT */
-	if (inverse) {
-		for (int i = 0; i < N; i++) {
-			out[i][0] /= N;
-			out[i][1] /= N;
-		}
-	}
+	put_wn_tbl(tbl);
 
 	return 0;
 }
 
 int tt_fft(double (*out)[2], double (*in)[2], uint N)
 {
-	return fft(out, in, N, false);
+	/* Check if N is 2^n */
+	if (N <= 1 || (N & (N-1))) {
+		tt_warn("%d is not power of 2, fallback to DFT", N);
+		return tt_dft(out, in, N);
+	}
+
+	return do_stage(out, in, N, fft_stage);
 }
 
 int tt_ifft(double (*out)[2], double (*in)[2], uint N)
 {
-	return fft(out, in, N, true);
+	if (N <= 1 || (N & (N-1))) {
+		tt_warn("%d is not power of 2, fallback to IDFT", N);
+		return tt_idft(out, in, N);
+	}
+
+	int ret = do_stage(out, in, N, ifft_stage);
+	if (ret)
+		return ret;
+
+	/* Divide N */
+	for (int i = 0; i < N; i++) {
+		out[i][0] /= N;
+		out[i][1] /= N;
+	}
+
+	return 0;
+}
+
+int tt_fft_real(double (*out)[2], const double *in, uint N)
+{
+	if (N <= 1 || (N & (N-1))) {
+		tt_warn("%d is not power of 2, fallback to DFT", N);
+		return tt_dft_real(out, in, N);
+	}
+
+	double (*tbl)[2];
+	int delta;
+
+	tbl = get_wn_tbl(N, &delta);
+	if (!tbl)
+		return TT_ENOMEM;
+
+	const int nb = __builtin_ctz(N);
+	for (int i = 0; i < N ; i++) {
+		out[i][0] = in[_tt_bitrev(i, nb)];
+		out[i][1] = 0;
+	}
+
+	for (int i = 1; i <= nb; i++)
+		fft_stage(out, i, N, tbl, delta);
+
+	put_wn_tbl(tbl);
+
+	return 0;
 }
