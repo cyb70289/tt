@@ -11,6 +11,8 @@
 
 #pragma GCC diagnostic ignored "-Wunused-variable"
 
+#define MUL_KARA
+
 /* 10^n, n = 0 ~ 8 */
 static const uint one_tbl[] = {
 	1, 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000,
@@ -389,6 +391,103 @@ static int shift_digs(uint *dst, uint dst_sz, const uint *src, int msb, int adj)
 	return msb;
 }
 
+#ifdef MUL_KARA
+/* Divide & Conqure: dig1 -> A B, dig2 -> C D
+ *          A B  <- dig1
+ *       x) C D  <- dig2
+ *  -----------
+ *  AC AD+BC BD  <- *digr
+ */
+static int mul_kara(uint *digr, const uint *dig1, const int msb1,
+		const uint *dig2, const int msb2)
+{
+	const int uints1 = (msb1 + 8) / 9;
+	const int uints2 = (msb2 + 8) / 9;
+
+	if (uints1 < 500 || uints2 < 500)
+		return mul_digs(digr, dig1, msb1, dig2, msb2);
+
+	int div = _tt_max(uints1, uints2) / 2;
+	int msb_a = 0, msb_b = msb1;
+	int msb_c = 0, msb_d = msb2;
+	if (div < uints1) {
+		msb_a = msb1 - div * 9;
+		msb_b = get_msb(dig1, div);
+		if (msb_b == 1 && dig1[0] == 0)
+			msb_b = 0;
+	}
+	if (div < uints2) {
+		msb_c = msb2 - div * 9;
+		msb_d = get_msb(dig2, div);
+		if (msb_d == 1 && dig2[0] == 0)
+			msb_d = 0;
+	}
+
+	/* Result = (A*C)*10^(div*2) + (A*D+B*C)*10^div + B*D */
+	int msb = 1;
+	int msb_ac = 0, msb_bd = 0;
+
+	/* B*D -> digr */
+	if (msb_b && msb_d) {
+		msb_bd = mul_kara(digr, dig1, msb_b, dig2, msb_d);
+		tt_assert_fa(msb_bd <= div*2*9);
+		msb = msb_bd;
+	}
+
+	/* A*C -> digr+div*2 */
+	if (msb_a && msb_c) {
+		msb_ac = mul_kara(digr+div*2, dig1+div, msb_a, dig2+div, msb_c);
+		msb = msb_ac + div*2*9;
+	}
+
+	/* A*D+B*C = (A+B)*(C+D)-(A*C+B*D) */
+	if (!((msb_a == 0 || msb_d == 0) && (msb_b == 0 || msb_c == 0))) {
+		const int sz1 = _tt_max(msb_a, msb_b) / 9 + 1;
+		const int sz2 = _tt_max(msb_c, msb_d) / 9 + 1;
+		const int sz3 = _tt_max(msb_a+msb_d, msb_b+msb_c) / 9 + 3;
+		uint *buf = calloc(sz1 + sz2 + sz3, 4);
+		uint *a_b = buf;
+		uint *c_d = a_b + sz1;
+		uint *ad_bc = c_d + sz2;
+
+		/* A+B */
+		int msb_a_b = 1;
+		if (msb_a) {
+			memcpy(a_b, dig1+div, (msb_a + 8) / 9 * 4);
+			msb_a_b = msb_a;
+		}
+		if (msb_b)
+			msb_a_b = add_digs(a_b, msb_a_b, dig1, msb_b);
+
+		/* C+D */
+		int msb_c_d = 1;
+		if (msb_c) {
+			memcpy(c_d, dig2+div, (msb_c + 8) / 9 * 4);
+			msb_c_d = msb_c;
+		}
+		if (msb_d)
+			msb_c_d = add_digs(c_d, msb_c_d, dig2, msb_d);
+
+		int msb_ad_bc = mul_kara(ad_bc, a_b, msb_a_b, c_d, msb_c_d);
+		if (msb_ac)
+			msb_ad_bc = sub_digs(ad_bc, ad_bc, msb_ad_bc,
+					digr+div*2, msb_ac);
+		if (msb_bd)
+			msb_ad_bc = sub_digs(ad_bc, ad_bc, msb_ad_bc,
+					digr, msb_bd);
+
+		int msb2 = msb - div*9;
+		if (msb2 <= 0)
+			msb2 = 1;
+		msb = add_digs(digr+div, msb2, ad_bc, msb_ad_bc) + div*9;
+
+		free(buf);
+	}
+
+	return msb;
+}
+#endif
+
 /* dst = src1 +/- src2
  * - sub: 0 -> add, 1 -> sub
  * - dst may share with src1 or src2
@@ -626,8 +725,13 @@ int tt_apn_mul(struct tt_apn *dst, const struct tt_apn *src1,
 	}
 
 	/* Multiply */
+#ifndef MUL_KARA
 	int msb = mul_digs(digr, src1->_dig32, src1->_msb,
 			src2->_dig32, src2->_msb);
+#else
+	int msb = mul_kara(digr, src1->_dig32, src1->_msb,
+			src2->_dig32, src2->_msb);
+#endif
 
 	/* Adjust significand, msb */
 	int adj = 0;
