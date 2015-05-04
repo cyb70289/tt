@@ -13,6 +13,7 @@
 *~
 *.swp
 *.tmp
+*.out
 
 # Top-level generic file
 /defconfig

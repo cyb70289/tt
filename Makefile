@@ -19,6 +19,13 @@ else
   quiet := quiet_
 endif
 
+# Build in profile if "make P=1"
+ifeq ("$(origin P)", "command line")
+  PROF := $(P)
+else
+  PROF := 0
+endif
+
 # Host
 HOSTCC		:= gcc
 HOST_STRIP	:= strip
@@ -61,6 +68,12 @@ CFLAGS		+= $(CFLAGS_TARGET)
 AFLAGS		+= $(AFLAGS_TARGET)
 LDFLAGS		+= $(LDFLAGS_TARGET)
 
+ifeq ($(PROF),1)
+  CFLAGS	+= -pg
+  AFLAGS	+= -pg
+  LDFLAGS	+= -pg
+endif
+
 # Check if were are building image
 BUILD_IMAGE	:= 1
 ifneq "$(filter %help,$(MAKECMDGOALS))" ""
@@ -100,7 +113,7 @@ to-dep-file = $(foreach f,$(subst .o,.d,$1),$(dir $(f)).$(notdir $(f)))
 define make-test-target
   BINS += $1/$2
   $1/$2: $$(addprefix $1/,$3) $$(LIBS)
-	$(Q)$(CC) $$^ $$(LIBS) $$(LDLIBS) -o $$@
+	$(Q)$(CC) $$(LDFLAGS) $$^ $$(LIBS) $$(LDLIBS) -o $$@
 	@$$(call show_msg,link,$$@)
 endef
 
@@ -195,6 +208,6 @@ all: $(LIBS) $(BINS)
 install: all
 
 clean:
-	$(Q)find src tests -name *.[oad] -o -name *.tmp | xargs $(RM)
+	$(Q)find src tests -regex ".*\.\([oad]\|tmp\|out\)" | xargs $(RM)
 	$(Q)$(RM) $(LIBS) $(BINS)
 	@$(call show_msg,clean,src tests)
