@@ -3,10 +3,10 @@
  * Copyright (C) 2015 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/apn/apn.h>
+#include <tt/apn/decimal.h>
 #include <tt/common/round.h>
 #include <common/lib.h>
-#include "apn.h"
+#include "decimal.h"
 
 #include <string.h>
 #include <math.h>
@@ -54,17 +54,17 @@ static int norm_fp_to_i64(double num, uint64_t *ui64)
 	return adjexp;
 }
 
-int tt_apn_from_uint(struct tt_apn *apn, uint64_t num)
+int tt_dec_from_uint(struct tt_dec *dec, uint64_t num)
 {
-	tt_assert(apn->_prec >= 20);
+	tt_assert(dec->_prec >= 20);
 
-	_tt_apn_zero(apn);
-	apn->_msb = _tt_apn_uint_to_dec(apn->_dig32, num);
+	_tt_dec_zero(dec);
+	dec->_msb = _tt_dec_uint_to_dec(dec->_dig32, num);
 
 	return 0;
 }
 
-int tt_apn_from_sint(struct tt_apn *apn, int64_t num)
+int tt_dec_from_sint(struct tt_dec *dec, int64_t num)
 {
 	short sign;
 	uint64_t unum;
@@ -77,25 +77,25 @@ int tt_apn_from_sint(struct tt_apn *apn, int64_t num)
 		unum = num;
 	}
 
-	int ret = tt_apn_from_uint(apn, unum);
-	apn->_sign = sign;
+	int ret = tt_dec_from_uint(dec, unum);
+	dec->_sign = sign;
 
 	return ret;
 }
 
-int tt_apn_from_float(struct tt_apn *apn, double num)
+int tt_dec_from_float(struct tt_dec *dec, double num)
 {
-	tt_assert(apn->_prec >= 20);
+	tt_assert(dec->_prec >= 20);
 
-	_tt_apn_zero(apn);
+	_tt_dec_zero(dec);
 
 	int sign = !!signbit(num);
 	switch (fpclassify(num)) {
 	case FP_NAN:
-		apn->_inf_nan = TT_APN_NAN;
+		dec->_inf_nan = TT_DEC_NAN;
 		return 0;
 	case FP_INFINITE:
-		apn->_inf_nan = TT_APN_INF;
+		dec->_inf_nan = TT_DEC_INF;
 		return 0;
 	case FP_ZERO:
 		return 0;
@@ -111,9 +111,9 @@ int tt_apn_from_float(struct tt_apn *apn, double num)
 	 */
 	uint64_t ui64;
 	int adjexp = norm_fp_to_i64(num, &ui64);
-	tt_apn_from_uint(apn, ui64);
-	apn->_exp = adjexp;
-	apn->_sign = sign;
+	tt_dec_from_uint(dec, ui64);
+	dec->_exp = adjexp;
+	dec->_sign = sign;
 
 	return 0;
 }
@@ -151,38 +151,38 @@ int tt_apn_from_float(struct tt_apn *apn, double num)
  * | - |  2047  | nonzero |            NaN            |
  * +---+--------+---------+---------------------------+
  */
-int tt_apn_to_float(const struct tt_apn *apn, double *num)
+int tt_dec_to_float(const struct tt_dec *dec, double *num)
 {
 	int ret = 0;
 	union {
 		uint64_t i;
 		double d;
 	} v;
-	struct tt_apn *apn_mm = NULL;
+	struct tt_dec *dec_mm = NULL;
 
 	/* Check zero */
-	if (_tt_apn_is_zero(apn)) {
+	if (_tt_dec_is_zero(dec)) {
 		v.i = 0;
 		goto out;
 	}
 
 	/* Check NaN, Inf */
-	if (apn->_inf_nan == TT_APN_INF) {
+	if (dec->_inf_nan == TT_DEC_INF) {
 		v.i = 2047ULL << 52;    /* Inf */
 		ret = TT_APN_EOVERFLOW;
 		goto out;
-	} else if (apn->_inf_nan == TT_APN_NAN) {
+	} else if (dec->_inf_nan == TT_DEC_NAN) {
 		v.i = (2047ULL << 52) | ((1ULL << 52) - 1);
 		ret = TT_APN_EINVAL;
 		goto out;
 	}
 
-	apn_mm = tt_apn_alloc(0);
+	dec_mm = tt_dec_alloc(0);
 
 	/* Check overflow */
 	v.i = (2046ULL << 52) | ((1ULL << 52) - 1);	/* Max double */
-	tt_apn_from_float(apn_mm, v.d);
-	if (tt_apn_cmp_abs(apn, apn_mm) >= 0) {
+	tt_dec_from_float(dec_mm, v.d);
+	if (tt_dec_cmp_abs(dec, dec_mm) >= 0) {
 		v.i = 2047ULL << 52;	/* Inf */
 		ret = TT_APN_EOVERFLOW;
 		tt_warn("Float overflow");
@@ -195,7 +195,7 @@ int tt_apn_to_float(const struct tt_apn *apn, double *num)
 	 * We restrict to normalized double bounded to 2.22E-308.
 	 */
 	v.i = 1ULL << 52;
-	if (tt_apn_cmp_abs(apn_mm, apn) >= 0) {
+	if (tt_dec_cmp_abs(dec_mm, dec) >= 0) {
 		v.i = 0;
 		ret = TT_APN_EUNDERFLOW;
 		tt_warn("Float underflow");
@@ -204,24 +204,24 @@ int tt_apn_to_float(const struct tt_apn *apn, double *num)
 
 	/* Round to 19 significands */
 	int sfr = 0, rnd = 0;
-	if (apn->_msb > 19) {
-		sfr = apn->_msb - 19;
-		rnd = _tt_round(_tt_apn_get_dig(apn->_dig32, sfr) & 1,
-					_tt_apn_get_dig(apn->_dig32, sfr-1),
+	if (dec->_msb > 19) {
+		sfr = dec->_msb - 19;
+		rnd = _tt_round(_tt_dec_get_dig(dec->_dig32, sfr) & 1,
+					_tt_dec_get_dig(dec->_dig32, sfr-1),
 					TT_ROUND_HALF_AWAY0);
 	}
 
 	/* Calculate significand */
 	long double ld = 0;
-	for (int i = apn->_msb - 1; i >= sfr; i--) {
+	for (int i = dec->_msb - 1; i >= sfr; i--) {
 		/* We can do much better here. Is it necessary? */
 		ld *= 10;
-		ld += _tt_apn_get_dig(apn->_dig32, i);
+		ld += _tt_dec_get_dig(dec->_dig32, i);
 	}
 	ld += rnd;	/* May cause overflow? */
 
 	/* Multiply/divide exponent */
-	int _exp = apn->_exp + sfr;
+	int _exp = dec->_exp + sfr;
 	int i = ARRAY_SIZE(_exp10) - 1;	/* _exp = 10^(2^i) */
 	if (_exp > 0) {
 		while (_exp > 0) {
@@ -244,11 +244,11 @@ int tt_apn_to_float(const struct tt_apn *apn, double *num)
 	v.d = ld;
 
 out:
-	if (apn_mm)
-		tt_apn_free(apn_mm);
+	if (dec_mm)
+		tt_dec_free(dec_mm);
 
 	/* Check sign */
-	if (apn->_sign)
+	if (dec->_sign)
 		v.i |= 1ULL << 63;
 
 	*num = v.d;

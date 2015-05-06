@@ -1,10 +1,10 @@
-/* Test arbitrary precision number
+/* Test arbitrary precision decimal
  *
  * Copyright (C) 2015 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/apn/apn.h>
-#include <apn/apn.h>
+#include <tt/apn/decimal.h>
+#include <apn/decimal.h>
 
 #include <math.h>
 #include <time.h>
@@ -84,14 +84,14 @@ static void verify_add(int count)
 {
 	bool fail = false;
 	char s[1024];
-	struct tt_apn *apn1, *apn2, *apn3;
+	struct tt_dec *dec1, *dec2, *dec3;
 
 	int old_level = tt_log_set_level(TT_LOG_WARN);
 
 	/* Special case */
-	apn1 = tt_apn_alloc(0);
-	apn2 = tt_apn_alloc(0);
-	apn3 = tt_apn_alloc(0);
+	dec1 = tt_dec_alloc(0);
+	dec2 = tt_dec_alloc(0);
+	dec3 = tt_dec_alloc(0);
 	static const struct {
 		const char *add1, *add2, *result;
 	} cases[] = {
@@ -107,11 +107,11 @@ static void verify_add(int count)
 		{ "-0E-20", "0E-1000", "-0E-1000" },
 	};
 	for (int i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
-		tt_apn_from_string(apn1, cases[i].add1);
-		tt_apn_from_string(apn2, cases[i].add2);
-		tt_apn_add(apn3, apn1, apn2);
-		tt_apn_to_string(apn3, s, 360);
-		if (_tt_apn_sanity(apn3)) {
+		tt_dec_from_string(dec1, cases[i].add1);
+		tt_dec_from_string(dec2, cases[i].add2);
+		tt_dec_add(dec3, dec1, dec2);
+		tt_dec_to_string(dec3, s, 360);
+		if (_tt_dec_sanity(dec3)) {
 			tt_error("Sanity error");
 			fail = true;
 			break;
@@ -123,35 +123,35 @@ static void verify_add(int count)
 			break;
 		}
 	}
-	tt_apn_free(apn1);
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 	if (fail)
 		return;
 
 	/* Big number */
 	printf("Add big number...\n");
-	apn1 = tt_apn_alloc(30);
-	apn2 = tt_apn_alloc(50);
-	apn3 = tt_apn_alloc(40);
+	dec1 = tt_dec_alloc(30);
+	dec2 = tt_dec_alloc(50);
+	dec3 = tt_dec_alloc(40);
 	for (int i = 0; i < count; i++) {
 		double d1, d2;
 		long double ld;
 		char s1[128], s2[128];
 		ld = get_num(s1, 1, 100);
-		tt_apn_from_string(apn1, s1);
+		tt_dec_from_string(dec1, s1);
 		ld += get_num(s2, 1, 100);
-		tt_apn_from_string(apn2, s2);
+		tt_dec_from_string(dec2, s2);
 		double prec = 1E-15;
-		if (apn1->_sign != apn2->_sign)
+		if (dec1->_sign != dec2->_sign)
 			prec = 1E-14;
-		tt_apn_add(apn3, apn2, apn1);
-		tt_apn_add(apn2, apn1, apn2);
-		tt_apn_to_float(apn3, &d1);
-		tt_apn_to_float(apn2, &d2);
+		tt_dec_add(dec3, dec2, dec1);
+		tt_dec_add(dec2, dec1, dec2);
+		tt_dec_to_float(dec3, &d1);
+		tt_dec_to_float(dec2, &d2);
 
-		if (_tt_apn_sanity(apn1) || _tt_apn_sanity(apn2) ||
-				_tt_apn_sanity(apn3)) {
+		if (_tt_dec_sanity(dec1) || _tt_dec_sanity(dec2) ||
+				_tt_dec_sanity(dec3)) {
 			tt_error("Sanity error");
 			fail = true;
 			break;
@@ -159,23 +159,23 @@ static void verify_add(int count)
 
 		if (!deq(ld, d1, prec) || !deq(ld, d2, prec)) {
 			tt_warn("Num add mismatch: %s + %s\nMach: %.18LE\n"
-					"APN:  %.18E\nAPN:  %.18E",
+					"DEC:  %.18E\nDEC:  %.18E",
 					s1, s2, ld, d1, d2);
 		}
 	}
 
-	tt_apn_free(apn1);
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 	if (fail)
 		return;
 
 #ifdef __STDC_IEC_559__
 	/* Random float */
 	printf("Add float...\n");
-	apn1 = tt_apn_alloc(0);
-	apn2 = tt_apn_alloc(0);
-	apn3 = tt_apn_alloc(0);
+	dec1 = tt_dec_alloc(0);
+	dec2 = tt_dec_alloc(0);
+	dec3 = tt_dec_alloc(0);
 
 	for (int i = 0; i < count; i++) {
 		double d1 = gen_float(307);
@@ -184,33 +184,33 @@ static void verify_add(int count)
 		if (signbit(d1) != signbit(d2))
 			prec = 1E-14;
 
-		tt_apn_from_float(apn1, d1);
-		tt_apn_from_float(apn2, d2);
+		tt_dec_from_float(dec1, d1);
+		tt_dec_from_float(dec2, d2);
 
-		tt_apn_add(apn3, apn1, apn2);
-		tt_apn_add(apn1, apn2, apn1);
+		tt_dec_add(dec3, dec1, dec2);
+		tt_dec_add(dec1, dec2, dec1);
 
-		if (_tt_apn_sanity(apn1) || _tt_apn_sanity(apn2) ||
-				_tt_apn_sanity(apn3)) {
+		if (_tt_dec_sanity(dec1) || _tt_dec_sanity(dec2) ||
+				_tt_dec_sanity(dec3)) {
 			tt_error("Sanity error");
 			fail = true;
 			break;
 		}
 
 		double vd1, vd2;
-		tt_apn_to_float(apn3, &vd1);
-		tt_apn_to_float(apn1, &vd2);
+		tt_dec_to_float(dec3, &vd1);
+		tt_dec_to_float(dec1, &vd2);
 
 		double ds = d1 + d2;
 		if (!deq(vd1, ds, prec) || !deq(vd2, ds, prec)) {
 			tt_warn("Float add mismatch: %.18E + %.18E\n"
-					"Mach: %.18E\nAPN:  %.18E\nAPN:  %.18E",
+					"Mach: %.18E\nDEC:  %.18E\nDEC:  %.18E",
 					d1, d2, ds, vd1, vd2);
 		}
 	}
-	tt_apn_free(apn1);
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 #endif
 
 	tt_log_set_level(old_level);
@@ -219,33 +219,33 @@ static void verify_add(int count)
 static void verify_sub(int count)
 {
 	bool fail = false;
-	struct tt_apn *apn1, *apn2, *apn3;
+	struct tt_dec *dec1, *dec2, *dec3;
 
 	int old_level = tt_log_set_level(TT_LOG_WARN);
 
 	/* Big number */
 	printf("Subtract big number...\n");
-	apn1 = tt_apn_alloc(30);
-	apn2 = tt_apn_alloc(50);
-	apn3 = tt_apn_alloc(40);
+	dec1 = tt_dec_alloc(30);
+	dec2 = tt_dec_alloc(50);
+	dec3 = tt_dec_alloc(40);
 	for (int i = 0; i < count; i++) {
 		double d1, d2;
 		long double ld;
 		char s1[128], s2[128];
 		ld = get_num(s1, 1, 100);
-		tt_apn_from_string(apn1, s1);
+		tt_dec_from_string(dec1, s1);
 		ld -= get_num(s2, 1, 100);
-		tt_apn_from_string(apn2, s2);
+		tt_dec_from_string(dec2, s2);
 		double prec = 1E-15;
-		if (apn1->_sign == apn2->_sign)
+		if (dec1->_sign == dec2->_sign)
 			prec = 1E-14;
-		tt_apn_sub(apn3, apn2, apn1);
-		tt_apn_sub(apn2, apn1, apn2);
-		tt_apn_to_float(apn3, &d1);
-		tt_apn_to_float(apn2, &d2);
+		tt_dec_sub(dec3, dec2, dec1);
+		tt_dec_sub(dec2, dec1, dec2);
+		tt_dec_to_float(dec3, &d1);
+		tt_dec_to_float(dec2, &d2);
 
-		if (_tt_apn_sanity(apn1) || _tt_apn_sanity(apn2) ||
-				_tt_apn_sanity(apn3)) {
+		if (_tt_dec_sanity(dec1) || _tt_dec_sanity(dec2) ||
+				_tt_dec_sanity(dec3)) {
 			tt_error("Sanity error");
 			fail = true;
 			break;
@@ -253,23 +253,23 @@ static void verify_sub(int count)
 
 		if (!deq(ld, -d1, prec) || !deq(ld, d2, prec)) {
 			tt_warn("Num sub mismatch: %s - %s\nMach: %.18LE\n"
-					"APN:  %.18E\nAPN:  %.18E",
+					"DEC:  %.18E\nDEC:  %.18E",
 					s1, s2, ld, -d1, d2);
 		}
 	}
 
-	tt_apn_free(apn1);
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 	if (fail)
 		return;
 
 #ifdef __STDC_IEC_559__
 	/* Random float */
 	printf("Subtract float...\n");
-	apn1 = tt_apn_alloc(0);
-	apn2 = tt_apn_alloc(0);
-	apn3 = tt_apn_alloc(0);
+	dec1 = tt_dec_alloc(0);
+	dec2 = tt_dec_alloc(0);
+	dec3 = tt_dec_alloc(0);
 
 	for (int i = 0; i < count; i++) {
 		double d1 = gen_float(307);
@@ -278,33 +278,33 @@ static void verify_sub(int count)
 		if (signbit(d1) == signbit(d2))
 			prec = 1E-14;
 
-		tt_apn_from_float(apn1, d1);
-		tt_apn_from_float(apn2, d2);
+		tt_dec_from_float(dec1, d1);
+		tt_dec_from_float(dec2, d2);
 
-		tt_apn_sub(apn3, apn1, apn2);
-		tt_apn_sub(apn1, apn2, apn1);
+		tt_dec_sub(dec3, dec1, dec2);
+		tt_dec_sub(dec1, dec2, dec1);
 
-		if (_tt_apn_sanity(apn1) || _tt_apn_sanity(apn2) ||
-				_tt_apn_sanity(apn3)) {
+		if (_tt_dec_sanity(dec1) || _tt_dec_sanity(dec2) ||
+				_tt_dec_sanity(dec3)) {
 			tt_error("Sanity error");
 			fail = true;
 			break;
 		}
 
 		double vd1, vd2;
-		tt_apn_to_float(apn3, &vd1);
-		tt_apn_to_float(apn1, &vd2);
+		tt_dec_to_float(dec3, &vd1);
+		tt_dec_to_float(dec1, &vd2);
 
 		double ds = d1 - d2;
 		if (!deq(vd1, ds, prec) || !deq(-vd2, ds, prec)) {
 			tt_warn("Float sub mismatch: %.18E - %.18E\n"
-					"Mach: %.18E\nAPN:  %.18E\nAPN:  %.18E",
+					"Mach: %.18E\nDEC:  %.18E\nDEC:  %.18E",
 					d1, d2, ds, vd1, -vd2);
 		}
 	}
-	tt_apn_free(apn1);
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 #endif
 
 	tt_log_set_level(old_level);
@@ -314,14 +314,14 @@ static void verify_mul(int count)
 {
 	bool fail = false;
 	char s[1024];
-	struct tt_apn *apn1, *apn2, *apn3;
+	struct tt_dec *dec1, *dec2, *dec3;
 
 	int old_level = tt_log_set_level(TT_LOG_WARN);
 
 	/* Special case */
-	apn1 = tt_apn_alloc(0);
-	apn2 = tt_apn_alloc(0);
-	apn3 = tt_apn_alloc(0);
+	dec1 = tt_dec_alloc(0);
+	dec2 = tt_dec_alloc(0);
+	dec3 = tt_dec_alloc(0);
 	static const struct {
 		const char *add1, *add2, *result;
 	} cases[] = {
@@ -334,11 +334,11 @@ static void verify_mul(int count)
 
 	};
 	for (int i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
-		tt_apn_from_string(apn1, cases[i].add1);
-		tt_apn_from_string(apn2, cases[i].add2);
-		tt_apn_mul(apn3, apn1, apn2);
-		tt_apn_to_string(apn3, s, 360);
-		if (_tt_apn_sanity(apn3)) {
+		tt_dec_from_string(dec1, cases[i].add1);
+		tt_dec_from_string(dec2, cases[i].add2);
+		tt_dec_mul(dec3, dec1, dec2);
+		tt_dec_to_string(dec3, s, 360);
+		if (_tt_dec_sanity(dec3)) {
 			tt_error("Sanity error");
 			fail = true;
 			break;
@@ -350,33 +350,33 @@ static void verify_mul(int count)
 			break;
 		}
 	}
-	tt_apn_free(apn1);
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 	if (fail)
 		return;
 
 	/* Big number */
 	printf("Mul big number...\n");
-	apn1 = tt_apn_alloc(30);
-	apn2 = tt_apn_alloc(50);
-	apn3 = tt_apn_alloc(40);
+	dec1 = tt_dec_alloc(30);
+	dec2 = tt_dec_alloc(50);
+	dec3 = tt_dec_alloc(40);
 	for (int i = 0; i < count; i++) {
 		double d1, d2;
 		long double ld;
 		char s1[128], s2[128];
 		ld = get_num(s1, 1, 100);
-		tt_apn_from_string(apn1, s1);
+		tt_dec_from_string(dec1, s1);
 		ld *= get_num(s2, 1, 100);
-		tt_apn_from_string(apn2, s2);
+		tt_dec_from_string(dec2, s2);
 		double prec = 1E-15;
-		tt_apn_mul(apn3, apn2, apn1);
-		tt_apn_mul(apn2, apn1, apn2);
-		tt_apn_to_float(apn3, &d1);
-		tt_apn_to_float(apn2, &d2);
+		tt_dec_mul(dec3, dec2, dec1);
+		tt_dec_mul(dec2, dec1, dec2);
+		tt_dec_to_float(dec3, &d1);
+		tt_dec_to_float(dec2, &d2);
 
-		if (_tt_apn_sanity(apn1) || _tt_apn_sanity(apn2) ||
-				_tt_apn_sanity(apn3)) {
+		if (_tt_dec_sanity(dec1) || _tt_dec_sanity(dec2) ||
+				_tt_dec_sanity(dec3)) {
 			tt_error("Sanity error");
 			fail = true;
 			break;
@@ -384,154 +384,148 @@ static void verify_mul(int count)
 
 		if (!deq(ld, d1, prec) || !deq(ld, d2, prec)) {
 			tt_warn("Num mul mismatch: %s * %s\nMach: %.18LE\n"
-					"APN:  %.18E\nAPN:  %.18E",
+					"DEC:  %.18E\nDEC:  %.18E",
 					s1, s2, ld, d1, d2);
 		}
 	}
 
-	tt_apn_free(apn1);
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 	if (fail)
 		return;
 
 #ifdef __STDC_IEC_559__
 	/* Random float */
 	printf("Mul float...\n");
-	apn1 = tt_apn_alloc(0);
-	apn2 = tt_apn_alloc(0);
-	apn3 = tt_apn_alloc(0);
+	dec1 = tt_dec_alloc(0);
+	dec2 = tt_dec_alloc(0);
+	dec3 = tt_dec_alloc(0);
 
 	for (int i = 0; i < count; i++) {
 		double d1 = gen_float(150);
 		double d2 = gen_float(150);
 		double prec = 1E-15;
 
-		tt_apn_from_float(apn1, d1);
-		tt_apn_from_float(apn2, d2);
+		tt_dec_from_float(dec1, d1);
+		tt_dec_from_float(dec2, d2);
 
-		tt_apn_mul(apn3, apn1, apn2);
-		tt_apn_mul(apn1, apn2, apn1);
+		tt_dec_mul(dec3, dec1, dec2);
+		tt_dec_mul(dec1, dec2, dec1);
 
-		if (_tt_apn_sanity(apn1) || _tt_apn_sanity(apn2) ||
-				_tt_apn_sanity(apn3)) {
+		if (_tt_dec_sanity(dec1) || _tt_dec_sanity(dec2) ||
+				_tt_dec_sanity(dec3)) {
 			tt_error("Sanity error");
 			fail = true;
 			break;
 		}
 
 		double vd1, vd2;
-		tt_apn_to_float(apn3, &vd1);
-		tt_apn_to_float(apn1, &vd2);
+		tt_dec_to_float(dec3, &vd1);
+		tt_dec_to_float(dec1, &vd2);
 
 		double ds = d1 * d2;
 		if (!deq(vd1, ds, prec) || !deq(vd2, ds, prec)) {
 			tt_warn("Float mul mismatch: %.18E * %.18E\n"
-					"Mach: %.18E\nAPN:  %.18E\nAPN:  %.18E",
+					"Mach: %.18E\nDEC:  %.18E\nDEC:  %.18E",
 					d1, d2, ds, vd1, vd2);
 		}
 	}
-	tt_apn_free(apn1);
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 #endif
 	tt_log_set_level(old_level);
 }
 
 /* Factorial with divide and conque approach */
-struct tt_apn *factorial(int i, int j)
+struct tt_dec *factorial(int i, int j)
 {
-	struct tt_apn *apn;
+	struct tt_dec *dec;
 
 	if (i == j) {
-		apn = tt_apn_alloc(0);
-		tt_apn_from_uint(apn, i);
-		return apn;
+		dec = tt_dec_alloc(0);
+		tt_dec_from_uint(dec, i);
+		return dec;
 	}
 
 	int m = (i + j) / 2;
-	struct tt_apn *apn1 = factorial(i, m);
-	struct tt_apn *apn2 = factorial(m+1, j);
+	struct tt_dec *dec1 = factorial(i, m);
+	struct tt_dec *dec2 = factorial(m+1, j);
 
-	apn = tt_apn_alloc(apn1->_prec + apn2->_prec);
-	tt_apn_mul(apn, apn1, apn2);
+	dec = tt_dec_alloc(dec1->_prec + dec2->_prec);
+	tt_dec_mul(dec, dec1, dec2);
 
-	tt_apn_free(apn1);
-	tt_apn_free(apn2);
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
 
-	return apn;
+	return dec;
 }
 
 int main(void)
 {
 #if 0
-	struct tt_apn *apn = tt_apn_alloc(50);
+	struct tt_dec *dec = tt_dec_alloc(50);
 	char s[3000];
 
-	tt_apn_from_sint(apn, 1ULL << 63);
-	tt_apn_to_string(apn, s, 100);
+	tt_dec_from_sint(dec, 1ULL << 63);
+	tt_dec_to_string(dec, s, 100);
 	printf("sint: %s == %lld\n", s, 1ULL << 63);
 
-	tt_apn_from_uint(apn, 1234567890987654321);
-	tt_apn_to_string(apn, s, 100);
+	tt_dec_from_uint(dec, 1234567890987654321);
+	tt_dec_to_string(dec, s, 100);
 	printf("uint: %s\n", s);
-
-	tt_apn_from_uint(apn, 123456789);
-	apn->_exp = -20;
-	apn->_sign = 1;
-	tt_apn_to_string(apn, s, 100);
-	printf("str: %s\n", s);
 
 	uint64_t dmax;
 	dmax = (2046ULL << 52) | ((1ULL << 52) - 1);	/* Max double */
-	tt_apn_from_float(apn, *(double *)&dmax);
-	tt_apn_to_string(apn, s, 100);
+	tt_dec_from_float(dec, *(double *)&dmax);
+	tt_dec_to_string(dec, s, 100);
 	printf("max double: %s\n", s);
 	dmax = 1;
-	tt_apn_from_float(apn, *(double *)&dmax);
-	tt_apn_to_string(apn, s, 100);
+	tt_dec_from_float(dec, *(double *)&dmax);
+	tt_dec_to_string(dec, s, 100);
 	printf("min double: %s\n", s);
 
 	double dv;
-	struct tt_apn *apn3 = tt_apn_alloc(320);
-	tt_apn_from_string(apn3, "1.218789511116565398");
-	struct tt_apn *apn2 = tt_apn_alloc(320);
-	tt_apn_from_string(apn2, "2.139450735390025820");
-	tt_apn_add(apn2, apn3, apn2);
-	tt_apn_to_string(apn2, s, 1000);
-	tt_apn_to_float(apn2, &dv);
+	struct tt_dec *dec3 = tt_dec_alloc(320);
+	tt_dec_from_string(dec3, "1.218789511116565398");
+	struct tt_dec *dec2 = tt_dec_alloc(320);
+	tt_dec_from_string(dec2, "2.139450735390025820");
+	tt_dec_add(dec2, dec3, dec2);
+	tt_dec_to_string(dec2, s, 1000);
+	tt_dec_to_float(dec2, &dv);
 	printf("add: %s\n     %.18E\n", s, dv);
-	if (_tt_apn_sanity(apn2))
-		tt_error("APN sanity error!");
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	if (_tt_dec_sanity(dec2))
+		tt_error("DEC sanity error!");
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 
-	apn3 = tt_apn_alloc(320);
-	tt_apn_from_string(apn3, "541295929775964129640116467012286");
-	apn2 = tt_apn_alloc(320);
-	tt_apn_from_string(apn2, "541295929775964129640116467012286");
-	tt_apn_sub(apn2, apn3, apn2);
-	tt_apn_to_string(apn2, s, 1000);
-	tt_apn_to_float(apn2, &dv);
+	dec3 = tt_dec_alloc(320);
+	tt_dec_from_string(dec3, "541295929775964129640116467012286");
+	dec2 = tt_dec_alloc(320);
+	tt_dec_from_string(dec2, "541295929775964129640116467012286");
+	tt_dec_sub(dec2, dec3, dec2);
+	tt_dec_to_string(dec2, s, 1000);
+	tt_dec_to_float(dec2, &dv);
 	printf("sub: %s\n     %.18E\n", s, dv);
-	if (_tt_apn_sanity(apn2))
-		tt_error("APN sanity error!");
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	if (_tt_dec_sanity(dec2))
+		tt_error("DEC sanity error!");
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 
-	apn3 = tt_apn_alloc(1000);
+	dec3 = tt_dec_alloc(1000);
 	#define M	"99999999999999999999999999999999999999999999999999"
 	#define M1000	M M M M M M M M M M M M M M M M M M M M
-	tt_apn_from_string(apn3, M1000);
-	apn2 = tt_apn_alloc(2000);
-	tt_apn_from_string(apn2, M1000);
-	tt_apn_mul(apn2, apn2, apn3);
-	tt_apn_to_string(apn2, s, 3000);
+	tt_dec_from_string(dec3, M1000);
+	dec2 = tt_dec_alloc(2000);
+	tt_dec_from_string(dec2, M1000);
+	tt_dec_mul(dec2, dec2, dec3);
+	tt_dec_to_string(dec2, s, 3000);
 	printf("mul:\n%s\n", s);
-	if (_tt_apn_sanity(apn2))
-		tt_error("APN sanity error!");
-	tt_apn_free(apn2);
-	tt_apn_free(apn3);
+	if (_tt_dec_sanity(dec2))
+		tt_error("DEC sanity error!");
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
 
 	const char *sci[] = {
 #if 0
@@ -545,11 +539,11 @@ int main(void)
 	};
 	for (int i = 0; i < sizeof(sci) / sizeof(sci[0]); i++) {
 		printf("%s --> ", sci[i]);
-		int err = tt_apn_from_string(apn, sci[i]);
+		int err = tt_dec_from_string(dec, sci[i]);
 		if (err < 0) {
 			printf("Error: %d\n", err);
 		} else {
-			if (tt_apn_to_string(apn, s, 100))
+			if (tt_dec_to_string(dec, s, 100))
 				printf("Buffer too small\n");
 			else
 				printf("%s\n", s);
@@ -559,10 +553,10 @@ int main(void)
 
 #if 0
 	int old_level = tt_log_set_level(TT_LOG_WARN);
-	struct tt_apn *apn_fac = factorial(1, 100000);
+	struct tt_dec *dec_fac = factorial(1, 100000);
 	char s_fac[500000];
-	tt_apn_to_string(apn_fac, s_fac, 500000);
-	tt_apn_free(apn_fac);
+	tt_dec_to_string(dec_fac, s_fac, 500000);
+	tt_dec_free(dec_fac);
 	printf("100000! = %s\n", s_fac);
 	tt_log_set_level(old_level);
 	return 0;

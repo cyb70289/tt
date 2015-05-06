@@ -3,9 +3,9 @@
  * Copyright (C) 2015 Yibo Cai
  */
 #include <tt/tt.h>
-#include <tt/apn/apn.h>
+#include <tt/apn/decimal.h>
 #include <common/lib.h>
-#include "apn.h"
+#include "decimal.h"
 
 #include <string.h>
 
@@ -167,7 +167,7 @@ static inline int shift_add_u128(uint *dig, int msb, __uint128_t ui128,
 {
 	/* Convert *ui128 to decimal */
 	uint dec[5] = { 0, 0, 0, 0, 0 };
-	int msb2 = _tt_apn_uint128_to_dec(dec, ui128);
+	int msb2 = _tt_dec_uint128_to_dec(dec, ui128);
 
 	/* Add dec[] to &dig[shift] */
 	return add_digs(dig+shift, msb-shift*9, dec, msb2) + shift*9;
@@ -177,7 +177,7 @@ static inline int shift_add_u64(uint *dig, int msb, uint64_t ui64, int shift)
 {
 	/* Convert ui64 to decimal */
 	uint dec[3] = { 0, 0, 0 };
-	int msb2 = _tt_apn_uint_to_dec(dec, ui64);
+	int msb2 = _tt_dec_uint_to_dec(dec, ui64);
 
 	/* Add dec[] to &dig[shift] */
 	return add_digs(dig+shift, msb-shift*9, dec, msb2) + shift*9;
@@ -393,8 +393,8 @@ static int shift_digs(uint *dst, uint dst_sz, const uint *src, int msb, int adj)
  * - sub: 0 -> add, 1 -> sub
  * - dst may share with src1 or src2
  */
-static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
-		const struct tt_apn *src2, int sub)
+static int add_sub_dec(struct tt_dec *dst, const struct tt_dec *src1,
+		const struct tt_dec *src2, int sub)
 {
 	int ret = 0;
 
@@ -404,24 +404,25 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 		sign2 = !sign2;
 
 	/* Check NaN, Inf */
-	if (src1->_inf_nan == TT_APN_NAN || src2->_inf_nan == TT_APN_NAN) {
-		dst->_inf_nan = TT_APN_NAN;
+	if (src1->_inf_nan == TT_DEC_NAN || src2->_inf_nan == TT_DEC_NAN) {
+		dst->_inf_nan = TT_DEC_NAN;
 		return TT_APN_EINVAL;
 	}
-	if (src1->_inf_nan == TT_APN_INF || src2->_inf_nan == TT_APN_INF) {
-		dst->_inf_nan = TT_APN_INF;
-		dst->_sign = (src1->_inf_nan == TT_APN_INF ? sign1 : sign2);
+	if (src1->_inf_nan == TT_DEC_INF || src2->_inf_nan == TT_DEC_INF) {
+		dst->_inf_nan = TT_DEC_INF;
+		dst->_sign = (src1->_inf_nan == TT_DEC_INF ? sign1 : sign2);
 		return TT_APN_EOVERFLOW;
 	}
+	dst->_inf_nan = 0;
 
 	/* Allocate a new APN if dst and src overlaps */
-	struct tt_apn *dst2 = dst;
+	struct tt_dec *dst2 = dst;
 	if (dst == src1 || dst == src2) {
-		dst2 = tt_apn_alloc(dst->_prec);
+		dst2 = tt_dec_alloc(dst->_prec);
 		if (!dst2)
 			return TT_ENOMEM;
 	} else {
-		_tt_apn_zero(dst);
+		_tt_dec_zero(dst);
 	}
 
 	/* Check exponent alignment.
@@ -438,7 +439,7 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 	/* Check rounding */
 	int msb_dst = src1->_msb;
 	/* Shifting "0" can't influence precision */
-	if (!_tt_apn_is_zero(src1))
+	if (!_tt_dec_is_zero(src1))
 		msb_dst += exp_adj1;
 	if (msb_dst < src2->_msb)
 		msb_dst = src2->_msb;
@@ -447,8 +448,8 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 		exp_adj1 -= adj_adj;
 		exp_adj2 -= adj_adj;
 	}
-	if ((exp_adj1 < 0 && !_tt_apn_is_true_zero(src1)) ||
-			(exp_adj2 < 0 && !_tt_apn_is_true_zero(src2)))
+	if ((exp_adj1 < 0 && !_tt_dec_is_true_zero(src1)) ||
+			(exp_adj2 < 0 && !_tt_dec_is_true_zero(src2)))
 		ret = TT_APN_EROUNDED;
 
 	/* Set result exponent, may adjust later */
@@ -458,8 +459,8 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 	int adj_adj = 0;
 	if (exp_adj2 < 0) {
 		int guard_adj = -exp_adj2;
-		if (guard_adj > TT_APN_PREC_RND)
-			guard_adj = TT_APN_PREC_RND;
+		if (guard_adj > TT_DEC_PREC_RND)
+			guard_adj = TT_DEC_PREC_RND;
 		if (-(exp_adj2 + guard_adj) < src2->_msb) {
 			exp_adj1 += guard_adj;
 			exp_adj2 += guard_adj;
@@ -478,9 +479,9 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 	}
 
 	/* "0" needn't shift */
-	if (_tt_apn_is_zero(src1))
+	if (_tt_dec_is_zero(src1))
 		exp_adj1 = 0;
-	if (_tt_apn_is_zero(src2))
+	if (_tt_dec_is_zero(src2))
 		exp_adj2 = 0;
 
 	/* Copy adjusted significand of src1 to dst */
@@ -526,8 +527,8 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 
 	/* Check rounding */
 	if (adj_adj) {
-		if (_tt_round(_tt_apn_get_dig(dst2->_dig32, adj_adj) & 1,
-				_tt_apn_get_dig(dst2->_dig32, adj_adj-1), 0)) {
+		if (_tt_round(_tt_dec_get_dig(dst2->_dig32, adj_adj) & 1,
+				_tt_dec_get_dig(dst2->_dig32, adj_adj-1), 0)) {
 			/* Construct 10^adj_adj */
 			tt_assert_fa(adj_adj < 36);
 			uint one[4] = { 0, 0, 0, 0 };
@@ -555,7 +556,7 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 	/* Switch buffer if dst overlap with src */
 	if (dst2 != dst) {
 		free(dst->_dig32);
-		memcpy(dst, dst2, sizeof(struct tt_apn));
+		memcpy(dst, dst2, sizeof(struct tt_dec));
 		free(dst2);
 	}
 
@@ -566,41 +567,40 @@ static int add_sub_apn(struct tt_apn *dst, const struct tt_apn *src1,
 }
 
 /* dst = src1 + src2. dst may share src1 or src2. */
-int tt_apn_add(struct tt_apn *dst, const struct tt_apn *src1,
-		const struct tt_apn *src2)
+int tt_dec_add(struct tt_dec *dst, const struct tt_dec *src1,
+		const struct tt_dec *src2)
 {
-	return add_sub_apn(dst, src1, src2, 0);
+	return add_sub_dec(dst, src1, src2, 0);
 }
 
 /* dst = src1 - src2. dst may share src1 or src2. */
-int tt_apn_sub(struct tt_apn *dst, const struct tt_apn *src1,
-		const struct tt_apn *src2)
+int tt_dec_sub(struct tt_dec *dst, const struct tt_dec *src1,
+		const struct tt_dec *src2)
 {
-	return add_sub_apn(dst, src1, src2, 1);
+	return add_sub_dec(dst, src1, src2, 1);
 }
 
 /* dst = src1 * src2. dst may share src1 or src2. */
-int tt_apn_mul(struct tt_apn *dst, const struct tt_apn *src1,
-		const struct tt_apn *src2)
+int tt_dec_mul(struct tt_dec *dst, const struct tt_dec *src1,
+		const struct tt_dec *src2)
 {
 	int ret = 0;
 
 	dst->_sign = src1->_sign ^ src2->_sign;
 
 	/* Check NaN, Inf */
-	if (src1->_inf_nan == TT_APN_NAN || src2->_inf_nan == TT_APN_NAN) {
-		dst->_inf_nan = TT_APN_NAN;
+	if (src1->_inf_nan == TT_DEC_NAN || src2->_inf_nan == TT_DEC_NAN) {
+		dst->_inf_nan = TT_DEC_NAN;
 		return TT_APN_EINVAL;
 	}
-	if (src1->_inf_nan == TT_APN_INF || src2->_inf_nan == TT_APN_INF) {
-		dst->_inf_nan = TT_APN_INF;
+	if (src1->_inf_nan == TT_DEC_INF || src2->_inf_nan == TT_DEC_INF) {
+		dst->_inf_nan = TT_DEC_INF;
 		return TT_APN_EOVERFLOW;
 	}
+	dst->_inf_nan = 0;
 
 	/* Check zero */
-	if (_tt_apn_is_zero(src1) || _tt_apn_is_zero(src2)) {
-		memset(dst->_dig32, 0, dst->_digsz);
-		dst->_msb = 1;
+	if (_tt_dec_is_zero(src1) || _tt_dec_is_zero(src2)) {
 		if (src1->_exp == 0 || src2->_exp == 0) {
 			dst->_exp = 0;	/* True zero */
 		} else {
@@ -609,6 +609,8 @@ int tt_apn_mul(struct tt_apn *dst, const struct tt_apn *src1,
 			if (dst->_exp > 0)
 				dst->_exp = 0;
 		}
+		dst->_msb = 1;
+		memset(dst->_dig32, 0, dst->_digsz);
 		return 0;
 	}
 
@@ -635,8 +637,8 @@ int tt_apn_mul(struct tt_apn *dst, const struct tt_apn *src1,
 		adj = msb - dst->_prec;
 
 		/* Check rounding */
-		if (_tt_round(_tt_apn_get_dig(digr, adj) & 1,
-				_tt_apn_get_dig(digr, adj-1), 0)) {
+		if (_tt_round(_tt_dec_get_dig(digr, adj) & 1,
+				_tt_dec_get_dig(digr, adj-1), 0)) {
 			/* Shift digr to have 1~9 extra digs */
 			if (adj >= 10) {
 				int shift = (adj - 1) / 9;
@@ -669,4 +671,59 @@ int tt_apn_mul(struct tt_apn *dst, const struct tt_apn *src1,
 
 	free(digr);
 	return ret;
+}
+
+/* dst = src1 / src2. dst may share src1 or src2. */
+int tt_dec_div(struct tt_dec *dst, const struct tt_dec *src1,
+		const struct tt_dec *src2)
+{
+	int ret = 0;
+
+	dst->_sign = src1->_sign ^ src2->_sign;
+
+	/* Check NaN, Inf */
+	if (src1->_inf_nan == TT_DEC_NAN || src2->_inf_nan == TT_DEC_NAN) {
+		dst->_inf_nan = TT_DEC_NAN;
+		return TT_APN_EINVAL;
+	}
+	if (src1->_inf_nan == TT_DEC_INF) {
+		if (src2->_inf_nan == TT_DEC_INF) {
+			dst->_inf_nan = TT_DEC_NAN;
+			return TT_APN_EINVAL;
+		} else {
+			dst->_inf_nan = TT_DEC_INF;
+			return TT_APN_EOVERFLOW;
+		}
+	}
+	if (src2->_inf_nan == TT_DEC_INF) {
+		_tt_dec_zero(dst);
+		return 0;
+	}
+
+	/* Check zero */
+	if (_tt_dec_is_zero(src2)) {
+		dst->_inf_nan = TT_DEC_NAN;
+		if (_tt_dec_is_zero(src1))
+			return TT_APN_EDIV_UNDEF;
+		else
+			return TT_APN_EDIV_0;
+	}
+	if (_tt_dec_is_zero(src1)) {
+		if (src1->_exp == 0) {
+			dst->_exp = 0;	/* True zero */
+		} else {
+			dst->_exp = (src1->_exp + src1->_msb) -
+				(src2->_exp + src2->_msb);
+			if (dst->_exp > 0)
+				dst->_exp = 0;
+		}
+		dst->_inf_nan = 0;
+		dst->_msb = 1;
+		memset(dst->_dig32, 0, dst->_digsz);
+		return 0;
+	}
+
+	dst->_inf_nan = 0;
+
+	return 0;
 }
