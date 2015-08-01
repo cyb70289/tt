@@ -51,6 +51,10 @@ static double gen_float(int mexp)
 
 static bool deq(double d1, double d2, double prec)
 {
+	if (isnan(d1))
+		return isnan(d2);
+	if (isinf(d1))
+		return isinf(d2) && signbit(d1) == signbit(d2);
 	if (d1 == 0)
 		return d2 == 0;
 	long double dd = (long double)d1 - (long double)d2;
@@ -438,6 +442,129 @@ static void verify_mul(int count)
 	tt_log_set_level(old_level);
 }
 
+static void verify_div(int count)
+{
+	bool fail = false;
+	char s[1024];
+	struct tt_dec *dec1, *dec2, *dec3;
+
+	int old_level = tt_log_set_level(TT_LOG_WARN);
+
+	/* Special case */
+	dec1 = tt_dec_alloc(0);
+	dec2 = tt_dec_alloc(0);
+	dec3 = tt_dec_alloc(0);
+	static const struct {
+		const char *add1, *add2, *result;
+	} cases[] = {
+		{ "0", "0", "NaN", },
+		{ "0.0", "1E-2000", "0" },
+	};
+	for (int i = 0; i < sizeof(cases)/sizeof(cases[0]); i++) {
+		tt_dec_from_string(dec1, cases[i].add1);
+		tt_dec_from_string(dec2, cases[i].add2);
+		tt_dec_div(dec3, dec1, dec2);
+		tt_dec_to_string(dec3, s, 360);
+		if (_tt_dec_sanity(dec3)) {
+			tt_error("Sanity error");
+			fail = true;
+			break;
+		}
+		if (strcmp(s, cases[i].result)) {
+			tt_error("%s / %s => %s",
+					cases[i].add1, cases[i].add2, s);
+			fail = true;
+			break;
+		}
+	}
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
+	if (fail)
+		return;
+
+	/* Big number */
+	printf("Div big number...\n");
+	dec1 = tt_dec_alloc(30);
+	dec2 = tt_dec_alloc(50);
+	dec3 = tt_dec_alloc(40);
+	for (int i = 0; i < count; i++) {
+		double d1, d2;
+		long double ld;
+		char s1[128], s2[128];
+		ld = get_num(s1, 1, 100);
+		tt_dec_from_string(dec1, s1);
+		ld /= get_num(s2, 1, 100);
+		tt_dec_from_string(dec2, s2);
+		double prec = 1E-15;
+		tt_dec_div(dec3, dec1, dec2);
+		tt_dec_div(dec2, dec1, dec2);
+		tt_dec_to_float(dec3, &d1);
+		tt_dec_to_float(dec2, &d2);
+
+		if (_tt_dec_sanity(dec1) || _tt_dec_sanity(dec2) ||
+				_tt_dec_sanity(dec3)) {
+			tt_error("Sanity error");
+			fail = true;
+			break;
+		}
+
+		if (!deq(ld, d1, prec) || !deq(ld, d2, prec)) {
+			tt_warn("Num div mismatch: %s / %s\nMach: %.18LE\n"
+					"DEC:  %.18E\nDEC:  %.18E",
+					s1, s2, ld, d1, d2);
+		}
+	}
+
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
+	if (fail)
+		return;
+
+#ifdef __STDC_IEC_559__
+	/* Random float */
+	printf("Div float...\n");
+	dec1 = tt_dec_alloc(0);
+	dec2 = tt_dec_alloc(0);
+	dec3 = tt_dec_alloc(0);
+
+	for (int i = 0; i < count; i++) {
+		double d1 = gen_float(150);
+		double d2 = gen_float(150);
+		double prec = 1E-15;
+
+		tt_dec_from_float(dec1, d1);
+		tt_dec_from_float(dec2, d2);
+
+		tt_dec_div(dec3, dec1, dec2);
+		tt_dec_div(dec1, dec1, dec2);
+
+		if (_tt_dec_sanity(dec1) || _tt_dec_sanity(dec2) ||
+				_tt_dec_sanity(dec3)) {
+			tt_error("Sanity error");
+			fail = true;
+			break;
+		}
+
+		double vd1, vd2;
+		tt_dec_to_float(dec3, &vd1);
+		tt_dec_to_float(dec1, &vd2);
+
+		double ds = d1 / d2;
+		if (!deq(vd1, ds, prec) || !deq(vd2, ds, prec)) {
+			tt_warn("Float div mismatch: %.18E * %.18E\n"
+					"Mach: %.18E\nDEC:  %.18E\nDEC:  %.18E",
+					d1, d2, ds, vd1, vd2);
+		}
+	}
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	tt_dec_free(dec3);
+#endif
+	tt_log_set_level(old_level);
+}
+
 /* Factorial with divide and conque approach */
 struct tt_dec *factorial(int i, int j)
 {
@@ -562,11 +689,33 @@ int main(void)
 	return 0;
 #endif
 
+#if 0
+	struct tt_dec *dividend = tt_dec_alloc(50);
+	struct tt_dec *divisor = tt_dec_alloc(50);
+	struct tt_dec *quotient = tt_dec_alloc(50);
+	char s[100];
+
+	tt_dec_from_uint(dividend, 10);
+	tt_dec_from_uint(divisor, 8888888888);
+	tt_dec_div(quotient, dividend, divisor);
+	tt_dec_div(dividend, dividend, divisor);
+
+	tt_dec_to_string(quotient, s, 100);
+	printf("div: %s\n", s);
+	tt_dec_to_string(dividend, s, 100);
+	printf("div: %s\n", s);
+
+	tt_dec_free(dividend);
+	tt_dec_free(divisor);
+	tt_dec_free(quotient);
+#endif
+
 	srand(time(NULL));
 
 	verify_add(100000);
 	verify_sub(100000);
 	verify_mul(100000);
+	verify_div(100000);
 
 	return 0;
 }

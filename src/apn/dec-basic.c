@@ -415,7 +415,7 @@ static int add_sub_dec(struct tt_dec *dst, const struct tt_dec *src1,
 	}
 	dst->_inf_nan = 0;
 
-	/* Allocate a new APN if dst and src overlaps */
+	/* Allocate a new DEC if dst and src overlaps */
 	struct tt_dec *dst2 = dst;
 	if (dst == src1 || dst == src2) {
 		dst2 = tt_dec_alloc(dst->_prec);
@@ -561,7 +561,7 @@ static int add_sub_dec(struct tt_dec *dst, const struct tt_dec *src1,
 	}
 
 	if (ret == TT_APN_EROUNDED)
-		tt_debug("APN rounded");
+		tt_debug("DEC rounded");
 
 	return ret;
 }
@@ -677,9 +677,9 @@ int tt_dec_mul(struct tt_dec *dst, const struct tt_dec *src1,
 int tt_dec_div(struct tt_dec *dst, const struct tt_dec *src1,
 		const struct tt_dec *src2)
 {
-	int ret = 0;
+	int ret = 0, sign = src1->_sign ^ src2->_sign;
 
-	dst->_sign = src1->_sign ^ src2->_sign;
+	dst->_sign = sign;
 
 	/* Check NaN, Inf */
 	if (src1->_inf_nan == TT_DEC_NAN || src2->_inf_nan == TT_DEC_NAN) {
@@ -702,11 +702,13 @@ int tt_dec_div(struct tt_dec *dst, const struct tt_dec *src1,
 
 	/* Check zero */
 	if (_tt_dec_is_zero(src2)) {
-		dst->_inf_nan = TT_DEC_NAN;
-		if (_tt_dec_is_zero(src1))
+		if (_tt_dec_is_zero(src1)) {
+			dst->_inf_nan = TT_DEC_NAN;
 			return TT_APN_EDIV_UNDEF;
-		else
+		} else {
+			dst->_inf_nan = TT_DEC_INF;
 			return TT_APN_EDIV_0;
+		}
 	}
 	if (_tt_dec_is_zero(src1)) {
 		if (src1->_exp == 0) {
@@ -723,7 +725,164 @@ int tt_dec_div(struct tt_dec *dst, const struct tt_dec *src1,
 		return 0;
 	}
 
-	dst->_inf_nan = 0;
+	/* Allocate a new DEC if dst overlaps src */
+	struct tt_dec *quotient = dst;
+	if (quotient == src1 || quotient == src2) {
+		quotient = tt_dec_alloc(quotient->_prec);
+		if (!quotient)
+			return TT_ENOMEM;
+	} else {
+		_tt_dec_zero(quotient);
+	}
 
-	return 0;
+	quotient->_sign = sign;
+	quotient->_exp = src1->_exp - src2->_exp;
+
+	/* Allocate dividend, divisor buffer */
+	const int uints = (_tt_max(src1->_msb, src2->_msb) + 1 + 8) / 9;
+	uint *dividend = calloc(uints, 4);
+	uint *divisor = calloc(uints, 4);
+	if (!dividend || !divisor) {
+		tt_error("Out of memory");
+		ret = TT_ENOMEM;
+		goto out;
+	}
+	memcpy(dividend, src1->_dig32, _tt_min(src1->_digsz, uints*4));
+	memcpy(divisor, src2->_dig32, _tt_min(src2->_digsz, uints*4));
+
+	int msb_dividend = src1->_msb;
+	int msb_divisor = src2->_msb;
+
+	/* Get highest digit */
+	int top_dividend = _tt_dec_get_dig(dividend, msb_dividend-1);
+	int top_divisor = _tt_dec_get_dig(divisor, msb_divisor-1);
+	tt_assert_fa(top_divisor && top_dividend);
+
+	/* Make dividend/divisor within [1, 10) */
+	int adj = msb_dividend - msb_divisor;
+	quotient->_exp += adj;
+	if (adj < 0)
+		msb_dividend = shift_digs(dividend, 0, dividend, msb_dividend, -adj);
+	else if (adj > 0)
+		msb_divisor = shift_digs(divisor, 0, divisor, msb_divisor, adj);
+	if (cmp_digs(dividend, msb_dividend, divisor, msb_divisor) < 0) {
+		quotient->_exp--;
+		msb_dividend = shift_digs(dividend, 0, dividend, msb_dividend, 1);
+		tt_assert_fa(msb_dividend == msb_divisor + 1);
+	} else {
+		tt_assert_fa(msb_dividend == msb_divisor);
+	}
+
+	/* Remove common trailing zeros */
+	while (1) {
+		if (msb_dividend <= 9 || msb_divisor <= 9)
+			break;
+		if (dividend[0] || divisor[0])
+			break;
+		const int sz_dividend = (msb_dividend + 8) / 9 * 4;
+		const int sz_divisor = (msb_divisor + 8) / 9 * 4;
+		msb_dividend = shift_digs(dividend, sz_dividend,
+				dividend, msb_dividend, -9);
+		msb_divisor = shift_digs(divisor, sz_divisor,
+				divisor, msb_divisor, -9);
+	}
+
+	int msb_result = 1;
+	uint *result = quotient->_dig32;
+	while (1) {
+		tt_assert_fa(msb_result <= (quotient->_prec + 1));
+
+		/* Repeat sub divisor from dividend till remainder < divisor */
+		int r;
+		for (r = 1; r < 10; r++) {
+			msb_dividend = sub_digs(dividend, dividend, msb_dividend,
+					divisor, msb_divisor);
+			if ((msb_dividend < msb_divisor) ||
+					(msb_dividend == msb_divisor &&
+					 cmp_digs(dividend, msb_dividend,
+						 divisor, msb_divisor) < 0))
+				break;
+		}
+		tt_assert_fa(r < 10 && cmp_digs(dividend, msb_dividend,
+					divisor, msb_divisor) < 0);
+
+		/* Store quotient */
+		tt_assert_fa(result[0] % 10 == 0);
+		result[0] += r;
+
+		/* Precision+rounding reached or residue is zero */
+		if ((msb_result > quotient->_prec) ||
+				(msb_dividend == 1 && dividend[0] == 0))
+			break;
+
+		/* Get highest digit */
+		top_dividend = _tt_dec_get_dig(dividend, msb_dividend-1);
+		top_divisor = _tt_dec_get_dig(divisor, msb_divisor-1);
+		tt_assert_fa(top_divisor && top_dividend);
+
+		/* Make dividend/divisor within [1, 10)
+		 * - dividend is less than divisor now
+		 */
+		adj = msb_dividend - msb_divisor;
+		if (adj < 0)
+			msb_dividend = shift_digs(dividend, 0, dividend, msb_dividend, -adj);
+		if (cmp_digs(dividend, msb_dividend, divisor, msb_divisor) < 0) {
+			adj--;
+			msb_dividend = shift_digs(dividend, 0, dividend, msb_dividend, 1);
+			tt_assert_fa(msb_dividend == msb_divisor + 1);
+		} else {
+			tt_assert_fa(msb_dividend == msb_divisor);
+		}
+		tt_assert_fa(adj < 0);
+		adj = -adj;
+
+		/* Append zero to quotient */
+		int prec_left = quotient->_prec - msb_result;
+		if (adj > (prec_left+1)) {
+			/* Precision+rounding reached */
+			msb_result = shift_digs(result, 0, result, msb_result, prec_left);
+			quotient->_exp -= prec_left;
+			ret = TT_APN_EROUNDED;
+			break;
+		}
+		msb_result = shift_digs(result, 0, result, msb_result, adj);
+		quotient->_exp -= adj;
+	}
+
+	/* Check rounding */
+	if (msb_result > quotient->_prec) {
+		if (_tt_round(_tt_dec_get_dig(result, 1) & 1,
+				_tt_dec_get_dig(result, 0), 0)) {
+			const uint ten = 10;
+			msb_result = add_digs(result, msb_result, &ten, 2);
+		}
+		adj = msb_result - quotient->_prec;
+		msb_result = shift_digs(result, quotient->_digsz,
+				result, msb_result, -adj);
+		quotient->_exp += adj;
+		ret = TT_APN_EROUNDED;
+	}
+
+	quotient->_msb = msb_result;
+
+	/* Switch buffer if dst overlaps src */
+	if (quotient != dst) {
+		free(dst->_dig32);
+		memcpy(dst, quotient, sizeof(struct tt_dec));
+		free(quotient);
+		quotient = NULL;
+	}
+
+out:
+	if (dividend)
+		free(dividend);
+	if (divisor)
+		free(divisor);
+	if (quotient && quotient != dst)
+		tt_dec_free(quotient);
+
+	if (ret == TT_APN_EROUNDED)
+		tt_debug("DEC rounded");
+
+	return ret;
 }
