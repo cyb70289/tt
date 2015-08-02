@@ -136,7 +136,7 @@ int tt_dec_from_string(struct tt_dec *dec, const char *str)
 	if (ret < 0)
 		goto invalid;
 
-	/* Parse exponent. TODO: xflow */
+	/* Parse exponent */
 	int _exp = 0;
 	if (str[epos]) {
 		if (_tt_atoi(str+epos+1, &_exp))
@@ -199,7 +199,7 @@ int tt_dec_to_string(const struct tt_dec *dec, char *str, uint len)
 	int note = 0;	/* abcd */
 	int ptpos = 0;	/* point position from msb */
 	int zeros = 0;	/* Prepending zeros when note == 1 */
-	const int adjexp = dec->_exp + dec->_msb - 1;	/* TODO: xflow */
+	const int adjexp = dec->_exp + dec->_msb - 1;
 	if (dec->_exp > 0 || adjexp < -6) {
 		if (dec->_msb == 1) {
 			note = 3;	/* aEadjexp */

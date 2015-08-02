@@ -546,7 +546,7 @@ static int add_sub_dec(struct tt_dec *dst, const struct tt_dec *src1,
 	if (dst2->_msb > dst2->_prec) {
 		adj_adj++;
 		dst2->_msb--;
-		dst2->_exp++;	/* TODO: xflow */
+		dst2->_exp++;
 		ret = TT_APN_EROUNDED;
 	}
 	shift_digs(dst2->_dig32, dst2->_digsz, dst2->_dig32, msb, -adj_adj);
@@ -614,7 +614,7 @@ int tt_dec_mul(struct tt_dec *dst, const struct tt_dec *src1,
 		return 0;
 	}
 
-	dst->_exp = src1->_exp + src2->_exp;	/* TODO: xflow */
+	dst->_exp = src1->_exp + src2->_exp;
 
 	/* Allocate result buffer
 	 * - add one extra rounding guard digits
@@ -646,7 +646,7 @@ int tt_dec_mul(struct tt_dec *dst, const struct tt_dec *src1,
 				shift_digs(digr, uints*4, digr, msb, -shift);
 				adj -= shift;
 				msb -= shift;
-				dst->_exp += shift;	/* TODO: xflow */
+				dst->_exp += shift;
 			}
 			/* Add 10^adj */
 			tt_assert_fa(adj >=1 && adj <= 9);
@@ -658,7 +658,7 @@ int tt_dec_mul(struct tt_dec *dst, const struct tt_dec *src1,
 			tt_assert_fa(adj >= 1);
 		}
 
-		dst->_exp += adj;	/* TODO: xflow */
+		dst->_exp += adj;
 		dst->_msb = dst->_prec;
 		ret = TT_APN_EROUNDED;
 	} else {
