@@ -190,11 +190,14 @@ int tt_dec_to_float(const struct tt_dec *dec, double *num)
 	}
 
 	/* Check underflow
-	 * XXX: Unnormalized double can handle 4.94E-324.
-	 * But it causes underrun in the div loop.
-	 * We restrict to normalized double bounded to 2.22E-308.
+	 * XXX: Unnormalized double bound may cause underrun in the div loop.
 	 */
-	v.i = 1ULL << 52;
+#if 1
+	v.i = 1;		/* Unnormalized, 4.94E-324 */
+#else
+	v.i = 1ULL << 52;	/* NOrmalized, 2.22E-308 */
+#endif
+	tt_dec_from_float(dec_mm, v.d);
 	if (tt_dec_cmp_abs(dec_mm, dec) >= 0) {
 		v.i = 0;
 		ret = TT_APN_EUNDERFLOW;

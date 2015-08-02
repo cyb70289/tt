@@ -565,6 +565,66 @@ static void verify_div(int count)
 	tt_log_set_level(old_level);
 }
 
+static void verify_cmp(int count)
+{
+	bool fail = false;
+	struct tt_dec *dec1, *dec2;
+
+	int old_level = tt_log_set_level(TT_LOG_WARN);
+
+	/* Big number */
+	printf("Cmp big number...\n");
+	dec1 = tt_dec_alloc(50);
+	dec2 = tt_dec_alloc(50);
+	for (int i = 0; i < count; i++) {
+		double d1, d2;
+		char s1[128], s2[128];
+		d1 = get_num(s1, 1, 100);
+		tt_dec_from_string(dec1, s1);
+		d2 = get_num(s2, 1, 100);
+		tt_dec_from_string(dec2, s2);
+
+		int c = tt_dec_cmp(dec1, dec2);
+		double d = d1 - d2;
+		if (!((c > 0 && d > 0) || (c < 0 && d < 0) || (c == 0 && d == 0))) {
+			tt_error("Num cmp mismatch: %s %s", s1, s2);
+			fail = true;
+			break;
+		}
+	}
+
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+	if (fail)
+		return;
+
+#ifdef __STDC_IEC_559__
+	/* Random float */
+	printf("Cmp float...\n");
+	dec1 = tt_dec_alloc(0);
+	dec2 = tt_dec_alloc(0);
+
+	for (int i = 0; i < count; i++) {
+		double d1 = gen_float(150);
+		double d2 = gen_float(150);
+
+		tt_dec_from_float(dec1, d1);
+		tt_dec_from_float(dec2, d2);
+
+		int c = tt_dec_cmp(dec1, dec2);
+		double d = d1 - d2;
+		if (!((c > 0 && d > 0) || (c < 0 && d < 0) || (c == 0 && d == 0))) {
+			tt_error("Num cmp mismatch: %.18E %.18E", d1, d2);
+			fail = true;
+			break;
+		}
+	}
+	tt_dec_free(dec1);
+	tt_dec_free(dec2);
+#endif
+	tt_log_set_level(old_level);
+}
+
 /* Factorial with divide and conque approach */
 struct tt_dec *factorial(int i, int j)
 {
@@ -712,10 +772,12 @@ int main(void)
 
 	srand(time(NULL));
 
-	verify_add(100000);
-	verify_sub(100000);
-	verify_mul(100000);
-	verify_div(100000);
+	const int count = 100000;
+	verify_add(count);
+	verify_sub(count);
+	verify_mul(count);
+	verify_div(count);
+	verify_cmp(count);
 
 	return 0;
 }

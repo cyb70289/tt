@@ -1,4 +1,4 @@
-/* Add, Sub, Multiply, Divide
+/* Add, Sub, Multiply, Divide, Compare
  *
  * Copyright (C) 2015 Yibo Cai
  */
@@ -492,6 +492,8 @@ static int add_sub_dec(struct tt_dec *dst, const struct tt_dec *src1,
 	uint *tmpdig = malloc(dst2->_digsz);
 	if (!tmpdig) {
 		tt_error("Out of memory");
+		if (dst2 != dst)
+			free(dst2);
 		return TT_ENOMEM;
 	}
 	memset(tmpdig, 0, dst2->_digsz);
@@ -559,9 +561,6 @@ static int add_sub_dec(struct tt_dec *dst, const struct tt_dec *src1,
 		memcpy(dst, dst2, sizeof(struct tt_dec));
 		free(dst2);
 	}
-
-	if (ret == TT_APN_EROUNDED)
-		tt_debug("DEC rounded");
 
 	return ret;
 }
@@ -762,7 +761,8 @@ int tt_dec_div(struct tt_dec *dst, const struct tt_dec *src1,
 	int adj = msb_dividend - msb_divisor;
 	quotient->_exp += adj;
 	if (adj < 0)
-		msb_dividend = shift_digs(dividend, 0, dividend, msb_dividend, -adj);
+		msb_dividend = shift_digs(dividend, 0,
+				dividend, msb_dividend, -adj);
 	else if (adj > 0)
 		msb_divisor = shift_digs(divisor, 0, divisor, msb_divisor, adj);
 	if (cmp_digs(dividend, msb_dividend, divisor, msb_divisor) < 0) {
@@ -825,10 +825,12 @@ int tt_dec_div(struct tt_dec *dst, const struct tt_dec *src1,
 		 */
 		adj = msb_dividend - msb_divisor;
 		if (adj < 0)
-			msb_dividend = shift_digs(dividend, 0, dividend, msb_dividend, -adj);
+			msb_dividend = shift_digs(dividend, 0,
+					dividend, msb_dividend, -adj);
 		if (cmp_digs(dividend, msb_dividend, divisor, msb_divisor) < 0) {
 			adj--;
-			msb_dividend = shift_digs(dividend, 0, dividend, msb_dividend, 1);
+			msb_dividend = shift_digs(dividend, 0,
+					dividend, msb_dividend, 1);
 			tt_assert_fa(msb_dividend == msb_divisor + 1);
 		} else {
 			tt_assert_fa(msb_dividend == msb_divisor);
@@ -840,7 +842,8 @@ int tt_dec_div(struct tt_dec *dst, const struct tt_dec *src1,
 		int prec_left = quotient->_prec - msb_result;
 		if (adj > (prec_left+1)) {
 			/* Precision+rounding reached */
-			msb_result = shift_digs(result, 0, result, msb_result, prec_left);
+			msb_result = shift_digs(result, 0,
+					result, msb_result, prec_left);
 			quotient->_exp -= prec_left;
 			ret = TT_APN_EROUNDED;
 			break;
@@ -881,8 +884,60 @@ out:
 	if (quotient && quotient != dst)
 		tt_dec_free(quotient);
 
-	if (ret == TT_APN_EROUNDED)
-		tt_debug("DEC rounded");
+	return ret;
+}
+
+/* Compare abs
+ * TODO: Check NaN, Inf
+ * - return < 0: src1 < src2
+ * - return = 0: src1 = src2
+ * - return > 0: src1 > src2
+ */
+int tt_dec_cmp_abs(const struct tt_dec *src1, const struct tt_dec *src2)
+{
+	int msb1 = src1->_msb, msb2 = src2->_msb;
+
+	int ret = (msb1 + src1->_exp) - (msb2 + src2->_exp);
+	if (ret)
+		return ret;
+
+	uint *dig1 = src1->_dig32, *dig2 = src2->_dig32;
+	const int uints = (_tt_max(msb1, msb2) + 8) / 9 * 4;
+
+	/* Align exponent */
+	int adj = src1->_exp - src2->_exp;
+	if (adj < 0) {
+		dig2 = calloc(uints, 4);
+		msb2 = shift_digs(dig2, 0, src2->_dig32, msb2, -adj);
+	} else if (adj > 0) {
+		dig1 = calloc(uints, 4);
+		msb1 = shift_digs(dig1, 0, src1->_dig32, msb1, adj);
+	}
+	tt_assert_fa(msb1 == msb2);
+
+	ret = cmp_digs(dig1, msb1, dig2, msb2);
+
+	if (dig1 != src1->_dig32)
+		free(dig1);
+	if (dig2 != src2->_dig32)
+		free(dig2);
+
+	return ret;
+}
+
+int tt_dec_cmp(const struct tt_dec *src1, const struct tt_dec *src2)
+{
+	int ret;
+
+	if (src1->_sign != src2->_sign) {
+		if (_tt_dec_is_zero(src1) && _tt_dec_is_zero(src2))
+			return 0;
+		ret = src2->_sign - src1->_sign;
+	} else {
+		ret = tt_dec_cmp_abs(src1, src2);
+		if (src1->_sign)
+			ret *= -1;
+	}
 
 	return ret;
 }
