@@ -71,4 +71,6 @@ uint _tt_dec_get_dig(const uint *dig, int pos);
 
 /* uint64/128 -> decimal */
 int _tt_dec_uint_to_dec(uint *dig32, uint64_t num);
+#ifdef __SIZEOF_INT128__
 int _tt_dec_uint128_to_dec(uint *dig32, __uint128_t num);
+#endif

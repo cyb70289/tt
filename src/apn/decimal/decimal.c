@@ -8,7 +8,6 @@
 #include "decimal.h"
 
 #include <string.h>
-#include <pthread.h>
 
 /* Creator */
 struct tt_dec *tt_dec_alloc(uint prec)

@@ -4,7 +4,7 @@
  */
 #include <tt/tt.h>
 #include <tt/apn/decimal.h>
-#include <apn/decimal.h>
+#include <apn/decimal/decimal.h>
 
 #include <math.h>
 #include <time.h>
