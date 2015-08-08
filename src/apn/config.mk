@@ -1,3 +1,3 @@
 lib-y := libttapn.a
 
-dir-y += decimal
+dir-y += decimal integer

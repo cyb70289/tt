@@ -755,8 +755,8 @@ int main(void)
 	struct tt_dec *quotient = tt_dec_alloc(50);
 	char s[100];
 
-	tt_dec_from_uint(dividend, 10);
-	tt_dec_from_uint(divisor, 8888888888);
+	tt_dec_from_uint(dividend, 999999999990);
+	tt_dec_from_uint(divisor, 2);
 	tt_dec_div(quotient, dividend, divisor);
 	tt_dec_div(dividend, dividend, divisor);
 
