@@ -1,4 +1,0 @@
-- makefile: LDLIBS should be set along with each binary
-- apn_to_float: long double to double conversion may result to wrong result
-- tt_stack, tt_queue: only ensures 8-bytes alignment
-- select, rank
