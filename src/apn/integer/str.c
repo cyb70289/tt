@@ -10,7 +10,7 @@
 #include <string.h>
 #include <math.h>
 
-static int ascii_to_dig(int v)
+static int ascii_to_bin(int v)
 {
 	if (v >= '0' && v <= '9')
 		v = v - '0';
@@ -23,34 +23,41 @@ static int ascii_to_dig(int v)
 	return v;
 }
 
-/* Divide "bcd" by 2 and store to "quo"
- * - Return 1 if dec is odd, 0 if even
- * - *len = valid digs in "bcd" on enter, digs in "quo" on exit
- * - Data in "bcd": 0 ~ 9
+/* Divide "bcd" by 2^31 and store quotient to "quo"
+ * - "bcd" and "quo" are BCD string: 0 ~ 9
+ * - Return remainder in binary format
+ * - *len = valid digs in "bcd" on enter, = valid digs in "quo" on exit
  * - "quo" is zeroed on entry
  */
-static int bcd_div2(const char *bcd, char *quo, uint *len)
+static uint bcd_div2g(const char *bcd, char *quo, uint *len)
 {
 	const int digs = *len;
 	tt_assert_fa(digs && bcd[0]);
 
-	int i = 0, j = 0, odd = 0;
+	int i = 0;
+	uint64_t rem = 0;
 
-	if (bcd[0] == 1) {
+	/* First quotient digit */
+	while (*len) {
+		rem *= 10;
+		rem += bcd[i++];
+		if (rem >= BIT(31)) {
+			quo[0] = rem / BIT(31);
+			rem %= BIT(31);
+			break;
+		}
 		(*len)--;
-		i++;
-		odd = 1;
 	}
 
-	for (; i < digs; i++, j++) {
-		int d = bcd[i];
-		if (odd)
-			d += 10;
-		quo[j] = d >> 1;
-		odd = d & 0x1;
+	/* Other quotient digits */
+	for (int j = 1; i < digs; i++, j++) {
+		uint64_t d = bcd[i];
+		d += rem * 10;
+		quo[j] = d / BIT(31);
+		rem = d % BIT(31);
 	}
 
-	return odd;
+	return rem;
 }
 
 int tt_int_from_string(struct tt_int *ti, const char *str)
@@ -88,7 +95,7 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 	/* Verify string */
 	const char *s = str;
 	while (*s) {
-		int v = ascii_to_dig(*s);
+		int v = ascii_to_bin(*s);
 		if (v < 0 || v >= radix) {
 			tt_debug("Invalid string");
 			return TT_EINVAL;
@@ -122,10 +129,14 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 			return TT_ENOMEM;
 		}
 		ti->_cnt = uints;
+		tt_debug("Integer reallocated: %u bytes", uints * 4);
 	}
 	_tt_int_zero(ti);
 
-	/* Convertion */
+	/* String to Integer conversion
+	 * - Decimal: Base 2^31 division to achieve fast conversion.
+	 * - Binary:  Bit by bit. Should we improve it?
+	 */
 	int cur_int = -1, cur_bit = 30;
 	if (radix == 10) {
 		/* Decimal */
@@ -133,16 +144,10 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 		char *bcd = malloc(digs);
 		char *quo = malloc(digs);
 		for (int i = 0; i < digs; i++)
-			bcd[i] = ascii_to_dig(str[i]);
+			bcd[i] = ascii_to_bin(str[i]);
 		while (len) {
 			memset(quo, 0, digs);
-			cur_bit++;
-			if (cur_bit == 31) {
-				cur_bit = 0;
-				cur_int++;
-			}
-			if (bcd_div2(bcd, quo, &len))
-				ti->_int[cur_int] |= BIT(cur_bit);
+			ti->_int[++cur_int] = bcd_div2g(bcd, quo, &len);
 			__tt_swap(bcd, quo);
 		}
 		free(bcd);
@@ -151,7 +156,7 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 		/* Binary */
 		s--;	/* Last digit */
 		while (s >= str) {
-			int c = ascii_to_dig(*s);
+			int c = ascii_to_bin(*s);
 			for (int i = radix; i > 1; i >>= 1) {
 				cur_bit++;
 				if (cur_bit == 31) {
