@@ -23,24 +23,26 @@ static int ascii_to_bin(int v)
 	return v;
 }
 
-/* Divide "bcd" by 2^31 and store quotient to "quo"
- * - "bcd" and "quo" are BCD string: 0 ~ 9
- * - Return remainder in binary format
- * - *len = valid digs in "bcd" on enter, = valid digs in "quo" on exit
+/* Divide "dividend" by 2^31 and store quotient to "quo", return remainder
+ * - "dividend" = [len-1] + [len-2]*10^9 + [len-3]*10^18 + ...
+ * - Each uint in "dividend" = 0 ~ 999,999,999
+ * - Low uint in "dividend" and "quo" means higher digits
+ * - *len = valid uints in "dividend" on entry, valid uints in "quo" on exit
  * - "quo" is zeroed on entry
  */
-static uint bcd_div2g(const char *bcd, char *quo, uint *len)
+static uint bcd_div2g(const uint *dividend, uint *quo, uint *len)
 {
-	const int digs = *len;
-	tt_assert_fa(digs && bcd[0]);
+	const int uints = *len;
+	tt_assert_fa(uints && dividend[0]);
 
 	int i = 0;
 	uint64_t rem = 0;
 
 	/* First quotient digit */
 	while (*len) {
-		rem *= 10;
-		rem += bcd[i++];
+		rem *= 1000000000;
+		rem += dividend[i];
+		i++;
 		if (rem >= BIT(31)) {
 			quo[0] = rem / BIT(31);
 			rem %= BIT(31);
@@ -50,11 +52,50 @@ static uint bcd_div2g(const char *bcd, char *quo, uint *len)
 	}
 
 	/* Other quotient digits */
-	for (int j = 1; i < digs; i++, j++) {
-		uint64_t d = bcd[i];
-		d += rem * 10;
+	for (int j = 1; i < uints; i++, j++) {
+		uint64_t d = dividend[i];
+		d += rem * 1000000000;
 		quo[j] = d / BIT(31);
 		rem = d % BIT(31);
+	}
+
+	return rem;
+}
+
+/* Divide "dividend" by 10^9 and store quotient to "quo", return remainder
+ * - "dividend" = [len-1] + [len-2]*2^31 + [len-3]*2^62 + ...
+ * - Each uint in "dividend" = 0 ~ 2^31-1
+ * - Low uint in "dividend" and "quo" means higher digits
+ * - *len = valid uints in "dividend" on entry, valid uints in "quo" on exit
+ * - "quo" is zeroed on entry
+ */
+static uint bin_div1b(const uint *dividend, uint *quo, uint *len)
+{
+	const int uints = *len;
+	tt_assert_fa(uints && dividend[0]);
+
+	int i = 0;
+	uint64_t rem = 0;
+
+	/* First quotient digit */
+	while (*len) {
+		rem *= BIT(31);
+		rem += dividend[i];
+		i++;
+		if (rem >= 1000000000) {
+			quo[0] = rem / 1000000000;
+			rem %= 1000000000;
+			break;
+		}
+		(*len)--;
+	}
+
+	/* Other quotient digits */
+	for (int j = 1; i < uints; i++, j++) {
+		uint64_t d = dividend[i];
+		d += rem * BIT(31);
+		quo[j] = d / 1000000000;
+		rem = d % 1000000000;
 	}
 
 	return rem;
@@ -117,43 +158,45 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 	tt_assert(bits);
 
 	/* Re-allocate buffer if required */
-	uint uints = (bits + 30) / 31;
-	if (uints > ti->_cnt) {
-		/* Double current buffer */
-		if (uints < ti->_cnt * 2)
-			uints = ti->_cnt * 2;
-
-		uint *_int = realloc(ti->_int, uints * 4);
-		if (!_int) {
-			tt_error("Not enough memory");
-			return TT_ENOMEM;
-		}
-		ti->_cnt = uints;
-		tt_debug("Integer reallocated: %u bytes", uints * 4);
-	}
+	const uint uints = (bits + 30) / 31;
+	int ret = _tt_int_relloc(ti, uints);
+	if (ret)
+		return ret;
 	_tt_int_zero(ti);
 
-	/* String to Integer conversion
-	 * - Decimal: Base 2^31 division to achieve fast conversion.
-	 * - Binary:  Bit by bit. Should we improve it?
-	 */
+	/* String to Integer conversion */
 	int cur_int = -1, cur_bit = 30;
 	if (radix == 10) {
-		/* Decimal */
-		uint len = digs;
-		char *bcd = malloc(digs);
-		char *quo = malloc(digs);
-		for (int i = 0; i < digs; i++)
-			bcd[i] = ascii_to_bin(str[i]);
-		while (len) {
-			memset(quo, 0, digs);
-			ti->_int[++cur_int] = bcd_div2g(bcd, quo, &len);
-			__tt_swap(bcd, quo);
+		s -= digs;	/* First digit */
+
+		uint len = (digs + 8) / 9;
+		uint *dividend = calloc(len, 4);
+		uint *quo = malloc(len * 4);
+
+		/* Pack 9-digits into one uint */
+		uint *pd = dividend;
+		int lt = digs % 9;	/* Digits in first uint */
+		if (lt == 0)
+			lt = 9;
+		for (uint i = 0; i < len; i++) {
+			for (int j = 0; j < lt; j++) {
+				(*pd) *= 10;
+				(*pd) += ascii_to_bin(*s++);
+			}
+			lt = 9;
+			pd++;
 		}
-		free(bcd);
+
+		/* Divide 2^31 till quotient = 0 */
+		while (len) {
+			memset(quo, 0, len * 4);
+			ti->_int[++cur_int] = bcd_div2g(dividend, quo, &len);
+			__tt_swap(dividend, quo);
+		}
+
+		free(dividend);
 		free(quo);
 	} else {
-		/* Binary */
 		s--;	/* Last digit */
 		while (s >= str) {
 			int c = ascii_to_bin(*s);
@@ -172,11 +215,131 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 	}
 
 	ti->_msb = cur_int + 1;
-	tt_assert(ti->_msb && ti->_msb <= ti->_cnt);
+	tt_assert(ti->_msb && ti->_msb <= ti->_max);
 	/* Top int may be 0 */
 	if (ti->_int[ti->_msb-1] == 0) {
 		ti->_msb--;
 		tt_assert(ti->_msb);
+	}
+
+	return 0;
+}
+
+int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
+{
+	static char bin_to_ascii[] = "0123456789ABCDEF";
+
+	if (*str)
+		tt_debug("Possible memory leak: str != NULL");
+
+	/* Allocate digit buffer (in 31 bits granularity) */
+	uint bits = ti->_msb * 31, digs;
+	int rbits = 0;
+	const char *prefix;
+	if (radix == 2) {
+		digs = bits;
+		rbits = 1;
+		prefix = "0b";
+	} else if (radix == 8) {
+		digs = (bits + 2) / 3;
+		rbits = 3;
+		prefix = "0";
+	} else if (radix == 16) {
+		digs = (bits + 3) / 4;
+		rbits = 4;
+		prefix = "0x";
+	} else if (radix == 10 || radix == 0) {
+		digs = (uint)(((double)bits) * log10(2)) + 1;
+		prefix = "";
+	} else {
+		tt_debug("Invalid radix");
+		return TT_EINVAL;
+	}
+	char *s = calloc(digs+1+2+1, 1);	/* -, 0x, \0 */
+	if (!s) {
+		tt_error("Not enough memory");
+		return TT_ENOMEM;
+	}
+	*str = s;
+
+	if (ti->_sign)
+		*s++ = '-';
+
+	if (_tt_int_is_zero(ti)) {
+		*s = '0';
+		return 0;
+	}
+
+	/* Radix prefix */
+	strcat(s, prefix);
+	s += strlen(prefix);
+
+	/* Integer to string conversion */
+	if (radix == 10) {
+		uint len = ti->_msb;
+		uint *dividend = malloc(len * 4);
+		uint *quo = malloc(len * 4);
+		char *dec = malloc(digs + 10);
+		char *pd = dec + digs + 9;
+		*pd-- = '\0';
+
+		/* Lower dividend stores higher digs */
+		for (uint i = 0; i < len; i++)
+			dividend[i] = ti->_int[len-1-i];
+
+		/* Divide 10^9 till quotient = 0 */
+		while (len) {
+			memset(quo, 0, len * 4);
+			uint rem = bin_div1b(dividend, quo, &len);
+			for (int i = 0; i < 9; i++) {
+				*pd-- = bin_to_ascii[rem % 10];
+				rem /= 10;
+			}
+			__tt_swap(dividend, quo);
+		}
+		pd++;
+
+		/* Copy to string buffer(strip leading zeros) */
+		while (*pd == '0')
+			pd++;
+		tt_assert(strlen(pd));
+		strcpy(s, pd);
+
+		free(dividend);
+		free(quo);
+		free(dec);
+	} else {
+		/* Get total digits */
+		int i;
+		uint d = ti->_int[ti->_msb-1];
+		for (i = 30; i >= 0; i--) {
+			if ((d & BIT(30)))
+				break;
+			d <<= 1;
+		}
+		tt_assert(i >= 0);
+		bits = (ti->_msb - 1) * 31 + i + 1;
+		digs = (bits + rbits - 1) / rbits;
+
+		s += (digs-1);
+		uint cur_int = 0, cur_bit = 0;
+		d = ti->_int[0];
+		while (digs--) {
+			cur_bit += rbits;
+			if (cur_bit < 31) {
+				i = d & (radix-1);
+				d >>= rbits;
+			} else {
+				cur_bit -= 31;
+				i = d;
+				d = ti->_int[++cur_int];
+				i |= ((d << (rbits-cur_bit)) & (radix-1));
+				d >>= cur_bit;
+			}
+			*s-- = bin_to_ascii[i];
+		}
+		tt_assert(cur_int == ti->_msb || cur_int == ti->_msb-1);
+		tt_assert(*(s+1) != '0');
 	}
 
 	return 0;

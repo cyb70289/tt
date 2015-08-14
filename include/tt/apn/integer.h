@@ -13,7 +13,7 @@ void tt_int_free(struct tt_int *ti);
 int tt_int_from_string(struct tt_int *ti, const char *str);
 int tt_int_from_sint(struct tt_int *ti, int64_t num);
 int tt_int_from_uint(struct tt_int *ti, uint64_t num);
-int tt_int_to_string(const struct tt_int *ti, char *str, uint len);
+int tt_int_to_string(const struct tt_int *ti, char **str, int radix);
 
 /* Operations */
 int tt_int_add(struct tt_int *dst, const struct tt_int *src1,
