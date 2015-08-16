@@ -96,7 +96,7 @@ static void verify_add(int count)
 	dec1 = tt_dec_alloc(0);
 	dec2 = tt_dec_alloc(0);
 	dec3 = tt_dec_alloc(0);
-	static const struct {
+	const struct {
 		const char *add1, *add2, *result;
 	} cases[] = {
 		{ "0", "0", "0", },
@@ -326,7 +326,7 @@ static void verify_mul(int count)
 	dec1 = tt_dec_alloc(0);
 	dec2 = tt_dec_alloc(0);
 	dec3 = tt_dec_alloc(0);
-	static const struct {
+	const struct {
 		const char *add1, *add2, *result;
 	} cases[] = {
 		{ "0", "0", "0", },
@@ -454,7 +454,7 @@ static void verify_div(int count)
 	dec1 = tt_dec_alloc(0);
 	dec2 = tt_dec_alloc(0);
 	dec3 = tt_dec_alloc(0);
-	static const struct {
+	const struct {
 		const char *add1, *add2, *result;
 	} cases[] = {
 		{ "0", "0", "NaN", },

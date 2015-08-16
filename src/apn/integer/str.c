@@ -103,6 +103,8 @@ static uint bin_div1b(const uint *dividend, uint *quo, uint *len)
 
 int tt_int_from_string(struct tt_int *ti, const char *str)
 {
+	_tt_int_zero(ti);
+
 	/* Check leading "+", "-" */
 	if (*str == '-') {
 		ti->_sign = 1;
@@ -128,10 +130,8 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 	/* Skip leading 0 */
 	while (*str == '0')
 		str++;
-	if (*str == '\0') {
-		_tt_int_zero(ti);
+	if (*str == '\0')
 		return 0;
-	}
 
 	/* Verify string */
 	const char *s = str;
@@ -162,7 +162,6 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 	int ret = _tt_int_relloc(ti, uints);
 	if (ret)
 		return ret;
-	_tt_int_zero(ti);
 
 	/* String to Integer conversion */
 	int cur_int = -1, cur_bit = 30;
@@ -230,7 +229,7 @@ int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
 	static char bin_to_ascii[] = "0123456789ABCDEF";
 
 	if (*str)
-		tt_debug("Possible memory leak: str != NULL");
+		tt_warn("Possible memory leak: str != NULL");
 
 	/* Allocate digit buffer (in 31 bits granularity) */
 	uint bits = ti->_msb * 31, digs;
