@@ -23,45 +23,6 @@ static int ascii_to_bin(int v)
 	return v;
 }
 
-/* Divide "dividend" by 2^31 and store quotient to "quo", return remainder
- * - "dividend" = [len-1] + [len-2]*10^9 + [len-3]*10^18 + ...
- * - Each uint in "dividend" = 0 ~ 999,999,999
- * - Low uint in "dividend" and "quo" means higher digits
- * - *len = valid uints in "dividend" on entry, valid uints in "quo" on exit
- * - "quo" is zeroed on entry
- */
-static uint bcd_div2g(const uint *dividend, uint *quo, uint *len)
-{
-	const int uints = *len;
-	tt_assert_fa(uints && dividend[0]);
-
-	int i = 0;
-	uint64_t rem = 0;
-
-	/* First quotient digit */
-	while (*len) {
-		rem *= 1000000000;
-		rem += dividend[i];
-		i++;
-		if (rem >= BIT(31)) {
-			quo[0] = rem / BIT(31);
-			rem %= BIT(31);
-			break;
-		}
-		(*len)--;
-	}
-
-	/* Other quotient digits */
-	for (int j = 1; i < uints; i++, j++) {
-		uint64_t d = dividend[i];
-		d += rem * 1000000000;
-		quo[j] = d / BIT(31);
-		rem = d % BIT(31);
-	}
-
-	return rem;
-}
-
 /* Divide "dividend" by 10^9 and store quotient to "quo", return remainder
  * - "dividend" = [len-1] + [len-2]*2^31 + [len-3]*2^62 + ...
  * - Each uint in "dividend" = 0 ~ 2^31-1
@@ -164,38 +125,61 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 		return ret;
 
 	/* String to Integer conversion */
-	int cur_int = -1, cur_bit = 30;
 	if (radix == 10) {
 		s -= digs;	/* First digit */
 
-		uint len = (digs + 8) / 9;
-		uint *dividend = calloc(len, 4);
-		uint *quo = malloc(len * 4);
-
-		/* Pack 9-digits into one uint */
-		uint *pd = dividend;
-		int lt = digs % 9;	/* Digits in first uint */
+		const uint len = (digs + 8) / 9;
+		int lt = digs % 9;	/* Digits in top uint */
 		if (lt == 0)
 			lt = 9;
+
+		uint msb = 1;	/* Valid uints in product */
+		uint *product = ti->_int;
+		uint carry;
+		uint64_t m;
 		for (uint i = 0; i < len; i++) {
+			/* Multiply product by 10^9 */
+			carry = 0;
+			for (uint j = 0; j < msb; j++) {
+				m = product[j] * 1000000000ULL;
+				m += carry;
+				carry = m >> 31;
+				if (carry)
+					product[j] = m & (BIT(31)-1);
+				else
+					product[j] = m;
+			}
+			if (carry)
+				product[msb++] = carry;
+
+			/* Pack 9-digits into one uint */
+			uint dig9 = 0;
 			for (int j = 0; j < lt; j++) {
-				(*pd) *= 10;
-				(*pd) += ascii_to_bin(*s++);
+				dig9 *= 10;
+				dig9 += ascii_to_bin(*s++);
 			}
 			lt = 9;
-			pd++;
-		}
 
-		/* Divide 2^31 till quotient = 0 */
-		while (len) {
-			memset(quo, 0, len * 4);
-			ti->_int[++cur_int] = bcd_div2g(dividend, quo, &len);
-			__tt_swap(dividend, quo);
+			/* Add 9 new decimal digits */
+			carry = dig9;
+			for (uint j = 0; j < msb; j++) {
+				m = product[j] + carry;
+				carry = m >> 31;
+				if (carry) {
+					product[j] = m & (BIT(31)-1);
+				} else {
+					product[j] = m;
+					break;
+				}
+			}
+			if (carry)
+				product[msb++] = carry;
 		}
-
-		free(dividend);
-		free(quo);
+		ti->_msb = msb;
+		tt_assert(*s == '\0');
 	} else {
+		int cur_int = -1, cur_bit = 30;
+
 		s--;	/* Last digit */
 		while (s >= str) {
 			int c = ascii_to_bin(*s);
@@ -211,14 +195,14 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 			}
 			s--;
 		}
-	}
 
-	ti->_msb = cur_int + 1;
-	tt_assert(ti->_msb && ti->_msb <= ti->_max);
-	/* Top int may be 0 */
-	if (ti->_int[ti->_msb-1] == 0) {
-		ti->_msb--;
-		tt_assert(ti->_msb);
+		ti->_msb = cur_int + 1;
+		tt_assert(ti->_msb && ti->_msb <= ti->_max);
+		/* Top int may be 0 */
+		if (ti->_int[ti->_msb-1] == 0) {
+			ti->_msb--;
+			tt_assert(ti->_msb);
+		}
 	}
 
 	return 0;
