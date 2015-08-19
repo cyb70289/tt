@@ -10,17 +10,18 @@
 #include <string.h>
 #include <math.h>
 
+static char bin_to_ascii[] = "0123456789ABCDEF";
+
 static int ascii_to_bin(int v)
 {
 	if (v >= '0' && v <= '9')
-		v = v - '0';
+		return v - '0';
 	else if (v >= 'a' && v <= 'f')
-		v = v - 'a' + 10;
+		return v - 'a' + 10;
 	else if (v >= 'A' && v <= 'F')
-		v = v - 'A' + 10;
+		return v - 'A' + 10;
 	else
-		v = -1;
-	return v;
+		return -1;
 }
 
 /* Divide "dividend" by 10^9 and store quotient to "quo", return remainder
@@ -210,8 +211,6 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 
 int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
 {
-	static char bin_to_ascii[] = "0123456789ABCDEF";
-
 	if (*str)
 		tt_warn("Possible memory leak: str != NULL");
 

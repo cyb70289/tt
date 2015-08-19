@@ -121,7 +121,7 @@ int tt_dec_from_float(struct tt_dec *dec, double num)
 #ifdef __STDC_IEC_559__
 /* IEEE-754 double precision number representation
  *
- * Layout(little endian):
+ * Layout:
  * +-------+----------------+
  * |  Bit  | Representation |
  * +-------+----------------+
@@ -195,7 +195,7 @@ int tt_dec_to_float(const struct tt_dec *dec, double *num)
 #if 1
 	v.i = 1;		/* Unnormalized, 4.94E-324 */
 #else
-	v.i = 1ULL << 52;	/* NOrmalized, 2.22E-308 */
+	v.i = 1ULL << 52;	/* Normalized, 2.22E-308 */
 #endif
 	tt_dec_from_float(dec_mm, v.d);
 	if (tt_dec_cmp_abs(dec_mm, dec) >= 0) {
