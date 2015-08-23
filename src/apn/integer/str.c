@@ -121,7 +121,7 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 
 	/* Re-allocate buffer if required */
 	const uint uints = (bits + 30) / 31;
-	int ret = _tt_int_relloc(ti, uints);
+	int ret = _tt_int_realloc(ti, uints);
 	if (ret)
 		return ret;
 

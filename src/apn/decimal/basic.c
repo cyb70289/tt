@@ -936,7 +936,7 @@ int tt_dec_cmp(const struct tt_dec *src1, const struct tt_dec *src2)
 	} else {
 		ret = tt_dec_cmp_abs(src1, src2);
 		if (src1->_sign)
-			ret *= -1;
+			ret = -ret;
 	}
 
 	return ret;

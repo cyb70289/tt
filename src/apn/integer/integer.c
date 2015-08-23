@@ -32,7 +32,7 @@ void tt_int_free(struct tt_int *ti)
 	free(ti);
 }
 
-int _tt_int_relloc(struct tt_int *ti, uint msb)
+int _tt_int_realloc(struct tt_int *ti, uint msb)
 {
 	if (msb <= ti->_max)
 		return 0;
