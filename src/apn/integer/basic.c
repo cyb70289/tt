@@ -145,6 +145,101 @@ static int add_sub_ints(struct tt_int *dst, const struct tt_int *src1,
 	return ret;
 }
 
+/* int1 += int2
+ * - int1 must have enough space to hold result
+ */
+static int add_buf(uint *int1, int msb1, const uint *int2, int msb2)
+{
+	int i, carry = 0;
+
+	for (i = 0; i < msb2; i++)
+		int1[i] = add_int(int1[i], int2[i], &carry);
+	for (; i < msb1; i++)
+		int1[i] = add_int(int1[i], 0, &carry);
+	if (carry)
+		int1[i++] = 1;
+
+	return i;
+}
+
+#ifdef __SIZEOF_INT128__
+static int from128(uint out[5], __uint128_t i128)
+{
+	int msb = 0;
+
+	while (i128) {
+		out[msb++] = i128 & (BIT(31) - 1);
+		i128 >>= 31;
+	}
+	for (int i = msb; i < 5; i++)
+		out[i] = 0;
+
+	if (msb == 0)
+		msb = 1;
+	return msb;
+}
+#else
+static int from64(uint out[3], uint64_t i64)
+{
+	int msb = 0;
+
+	while (i64) {
+		out[msb++] = i64 & (BIT(31) - 1);
+		i64 >>= 31;
+	}
+	for (int i = msb; i < 3; i++)
+		out[i] = 0;
+
+	if (msb == 0)
+		msb = 1;
+	return msb;
+}
+#endif
+
+/* intr = int1 * int2
+ * - int1, int2 are not zero
+ * - intr must have enough space to hold result
+ * - intr is zeroed
+ * - return result length
+ */
+static int mul_ints(uint *intr, const uint *int1, const int msb1,
+		const uint *int2, const int msb2)
+{
+	int msb = 1;
+
+	for (int i = 0; i < msb1 + msb2; i++) {
+		int jmax = i;
+		if (jmax >= msb1)
+			jmax = msb1 - 1;
+		int jmin = i - msb2 + 1;
+		if (jmin < 0)
+			jmin = 0;
+
+#ifdef __SIZEOF_INT128__
+		__uint128_t tmp128 = 0;
+		uint tmp[5];
+		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++)
+			tmp128 += (uint64_t)int1[j] * int2[k];
+		int msbt = from128(tmp, tmp128);
+		msb = add_buf(intr+i, msb-i, tmp, msbt) + i;
+#else
+		uint tmp[3];
+		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++) {
+			uint64_t tmp64 = (uint64_t)int1[j] * int2[k];
+			int msbt = from64(tmp, tmp64);
+			msb = add_buf(intr+i, msb-i, tmp, msbt) + i;
+		}
+#endif
+	}
+
+	/* Top int may be 0 */
+	if (intr[msb-1] == 0 && msb > 1)
+		msb--;
+	tt_assert_fa(msb >= msb1 && msb >= msb2 && msb <= (msb1 + msb2));
+
+	return msb;
+}
+
 /* dst = src1 + src2. dst may share src1 or src2. */
 int tt_int_add(struct tt_int *dst, const struct tt_int *src1,
 		const struct tt_int *src2)
@@ -157,6 +252,39 @@ int tt_int_sub(struct tt_int *dst, const struct tt_int *src1,
 		const struct tt_int *src2)
 {
 	return add_sub_ints(dst, src1, src2, 1);
+}
+
+/* dst = src1 * src2. dst may share src1 or src2. */
+int tt_int_mul(struct tt_int *dst, const struct tt_int *src1,
+		const struct tt_int *src2)
+{
+	if (_tt_int_is_zero(src1) || _tt_int_is_zero(src2)) {
+		_tt_int_zero(dst);
+		return 0;
+	}
+
+	/* Allocate result buffer */
+	uint *r = calloc(src1->_msb + src2->_msb + 2, 4);
+	if (!r) {
+		tt_error("Out of memory");
+		return TT_ENOMEM;
+	}
+
+	int sign = src1->_sign ^ src2->_sign;
+	uint msb = mul_ints(r, src1->_int, src1->_msb, src2->_int, src2->_msb);
+	if (dst->_max < msb) {
+		int ret = _tt_int_realloc(dst, msb);
+		if (ret)
+			return ret;
+	} else {
+		_tt_int_zero(dst);
+	}
+	memcpy(dst->_int, r, msb * 4);
+	dst->_msb = msb;
+	dst->_sign = sign;
+
+	free(r);
+	return 0;
 }
 
 /* Compare absolute value

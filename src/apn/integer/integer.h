@@ -7,7 +7,7 @@
 struct tt_int {
 	int _sign;		/* Sign: 0/+, 1/- */
 
-#define TT_INT_MAX	19	/* 2^(19*31)-1 --> 177 full decimal digits */
+#define TT_INT_DEF	19	/* 2^(19*31)-1 --> 177 decimal digits */
 #define TT_INT_GUARD	1	/* Guard ints at top of _int[] */
 	const uint __sz;	/* Size of _int[] buffer in ints */
 	const uint _max;	/* Maximum integers in _int[], 1 ~ __sz-1 */

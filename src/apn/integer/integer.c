@@ -12,8 +12,8 @@
 struct tt_int *tt_int_alloc(void)
 {
 	struct tt_int *ti = calloc(1, sizeof(struct tt_int));
-	*(uint *)&ti->__sz = TT_INT_MAX + TT_INT_GUARD;
-	*(uint *)&ti->_max = TT_INT_MAX;
+	*(uint *)&ti->__sz = TT_INT_DEF + TT_INT_GUARD;
+	*(uint *)&ti->_max = TT_INT_DEF;
 	ti->_msb = 1;
 	ti->_int = calloc(ti->__sz, 4);
 	if (ti->_int == NULL) {
