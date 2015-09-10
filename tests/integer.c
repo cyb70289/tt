@@ -217,6 +217,21 @@ int main(void)
 	tt_int_free(ti2);
 #endif
 
+#if 0
+	int old_level = tt_log_set_level(TT_LOG_INFO);
+	tt_info("Calculating...");
+	struct tt_int *ti = tt_int_alloc();
+	tt_int_factorial(ti, 100000);
+	char *s = NULL;
+	tt_info("Coverting...");
+	tt_int_to_string(ti, &s, 10);
+	printf("%s\n", s);
+	free(s);
+	tt_int_free(ti);
+	tt_log_set_level(old_level);
+	return 0;
+#endif
+
 	srand(time(NULL));
 	tt_log_set_level(TT_LOG_WARN);
 

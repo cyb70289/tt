@@ -202,7 +202,7 @@ static int from64(uint out[3], uint64_t i64)
  * - intr is zeroed
  * - return result length
  */
-static int mul_ints(uint *intr, const uint *int1, const int msb1,
+int _tt_int_mul_buf(uint *intr, const uint *int1, const int msb1,
 		const uint *int2, const int msb2)
 {
 	int msb = 1;
@@ -264,14 +264,15 @@ int tt_int_mul(struct tt_int *dst, const struct tt_int *src1,
 	}
 
 	/* Allocate result buffer */
-	uint *r = calloc(src1->_msb + src2->_msb + 2, 4);
+	uint *r = calloc(src1->_msb + src2->_msb, 4);
 	if (!r) {
 		tt_error("Out of memory");
 		return TT_ENOMEM;
 	}
 
 	int sign = src1->_sign ^ src2->_sign;
-	uint msb = mul_ints(r, src1->_int, src1->_msb, src2->_int, src2->_msb);
+	uint msb = _tt_int_mul_buf(r, src1->_int, src1->_msb,
+			src2->_int, src2->_msb);
 	if (dst->_max < msb) {
 		int ret = _tt_int_realloc(dst, msb);
 		if (ret)

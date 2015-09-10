@@ -28,3 +28,6 @@ int tt_int_div(struct tt_int *quo, struct tt_int *rem,
 /* Logical */
 int tt_int_cmp(const struct tt_int *src1, const struct tt_int *src2);
 int tt_int_cmp_abs(const struct tt_int *src1, const struct tt_int *src2);
+
+/* Math */
+int tt_int_factorial(struct tt_int *ti, const int n);
