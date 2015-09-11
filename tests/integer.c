@@ -195,7 +195,7 @@ int main(void)
 
 	struct tt_int *ti1 = tt_int_alloc();
 	struct tt_int *ti2 = tt_int_alloc();
-	tt_int_from_string(ti1, "-11111111111111111111111111111111111111111111");
+	tt_int_from_string(ti1, "-1111111111111111111111111111111111111111111");
 	tt_int_from_string(ti2, "99999999999999999999999999999");
 	tt_int_sub(ti1, ti1, ti2);
 	tt_int_to_string(ti1, &s, 10);
@@ -203,11 +203,11 @@ int main(void)
 	free(s);
 	s = NULL;
 
-	tt_int_from_string(ti1, "-111111111111111111111111111111111111111111");
-	tt_int_from_string(ti2, "99999999999999999999999999999");
+	tt_int_from_string(ti1, "0x1000000000000000000000000000000000000000");
+	tt_int_from_string(ti2, "0x20000000000000000000000000000000000");
 	tt_int_mul(ti, ti1, ti2);
 	assert(_tt_int_sanity(ti) == 0);
-	tt_int_to_string(ti, &s, 10);
+	tt_int_to_string(ti, &s, 16);
 	printf("%s\n", s);
 	free(s);
 	s = NULL;
@@ -215,6 +215,8 @@ int main(void)
 	tt_int_free(ti);
 	tt_int_free(ti1);
 	tt_int_free(ti2);
+
+	return 0;
 #endif
 
 #if 0

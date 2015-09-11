@@ -26,7 +26,7 @@ int tt_int_factorial(struct tt_int *ti, const int n)
 	}
 	uint *oper = ibuf;
 	uint *result = ibuf + n;
-	uint *msb = result + n;
+	int *msb = (int*)result + n;
 
 	/* Initialize operators */
 	for (int i = 0; i < n; i++) {
@@ -35,7 +35,7 @@ int tt_int_factorial(struct tt_int *ti, const int n)
 	}
 
 	/* Divide and conqure */
-	int ops = n;
+	int ops = n, ret = 0;
 	while (ops > 1) {
 		__tt_swap(oper, result);
 		memset(result, 0, n * 4);
@@ -46,6 +46,10 @@ int tt_int_factorial(struct tt_int *ti, const int n)
 		for (i = j = 0; i < ops/2; i++, j += 2) {
 			uint *o2 = o + msb[j];
 			msb[i] = _tt_int_mul_buf(r, o, msb[j], o2, msb[j+1]);
+			if (msb[i] < 0) {
+				ret = msb[i];
+				goto out;
+			}
 			o = o2 + msb[j+1];
 			r += msb[i];
 		}
@@ -64,16 +68,16 @@ int tt_int_factorial(struct tt_int *ti, const int n)
 
 	/* Result in: result[], msb[0] */
 	if (ti->_max < msb[0]) {
-		int ret = _tt_int_realloc(ti, msb[0]);
+		ret = _tt_int_realloc(ti, msb[0]);
 		if (ret)
-			return ret;
+			goto out;
 	} else {
 		_tt_int_zero(ti);
 	}
 	memcpy(ti->_int, result, msb[0] * 4);
 	ti->_msb = msb[0];
 
+out:
 	free(ibuf);
-
-	return 0;
+	return ret;
 }

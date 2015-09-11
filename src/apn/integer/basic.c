@@ -9,6 +9,8 @@
 
 #include <string.h>
 
+#define KARA_CROSS	200	/* Karatsuba/classic cross point */
+
 /* Add two int and carry
  * - i1, i2 < 2^31
  * - return result uint and carry
@@ -147,6 +149,7 @@ static int add_sub_ints(struct tt_int *dst, const struct tt_int *src1,
 
 /* int1 += int2
  * - int1 must have enough space to hold result
+ * - return result msb
  */
 static int add_buf(uint *int1, int msb1, const uint *int2, int msb2)
 {
@@ -154,10 +157,34 @@ static int add_buf(uint *int1, int msb1, const uint *int2, int msb2)
 
 	for (i = 0; i < msb2; i++)
 		int1[i] = add_int(int1[i], int2[i], &carry);
-	for (; i < msb1; i++)
+	for (; i < msb1; i++) {
+		if (carry == 0)
+			return msb1;
 		int1[i] = add_int(int1[i], 0, &carry);
+	}
 	if (carry)
 		int1[i++] = 1;
+
+	return i;
+}
+
+/* int1 -= int2
+ * - int1 >= int2
+ * - return result msb
+ */
+static int sub_buf(uint *int1, int msb1, const uint *int2, int msb2)
+{
+	int i, borrow = 0;
+
+	for (i = 0; i < msb2; i++)
+		int1[i] = sub_int(int1[i], int2[i], &borrow);
+	for (; i < msb1; i++) {
+		if (borrow == 0)
+			return msb1;
+		int1[i] = sub_int(int1[i], 0, &borrow);
+	}
+	while (i > 1 && int1[i-1] == 0)
+		i--;
 
 	return i;
 }
@@ -196,13 +223,24 @@ static int from64(uint out[3], uint64_t i64)
 }
 #endif
 
-/* intr = int1 * int2
+static int get_uints(const uint *ui, int len)
+{
+	while (len) {
+		if (ui[len-1])
+			return len;
+		len--;
+	}
+	return 0;
+}
+
+/* Classic multiplication
+ * - intr = int1 * int2
  * - int1, int2 are not zero
  * - intr must have enough space to hold result
  * - intr is zeroed
  * - return result length
  */
-int _tt_int_mul_buf(uint *intr, const uint *int1, const int msb1,
+static int mul_buf_classic(uint *intr, const uint *int1, const int msb1,
 		const uint *int2, const int msb2)
 {
 	int msb = 1;
@@ -235,9 +273,133 @@ int _tt_int_mul_buf(uint *intr, const uint *int1, const int msb1,
 	/* Top int may be 0 */
 	if (intr[msb-1] == 0 && msb > 1)
 		msb--;
-	tt_assert_fa(msb >= msb1 && msb >= msb2 && msb <= (msb1 + msb2));
 
+	tt_assert_fa(msb == (msb1+msb2) || msb == (msb1+msb2-1));
 	return msb;
+}
+
+/* Karatsuba multiplication
+ *        A   B  <- int1
+ *    x)  C   D  <- int2
+ *  -----------
+ *  AC AD+BC BD  <- intr
+ *
+ * - intr = int1 * int2
+ * - int1, int2 are not zero
+ * - intr must have enough space to hold result
+ * - intr is zeroed
+ * - return result length
+ */
+static int mul_buf_kara(uint *intr, const uint *int1, const int msb1,
+		const uint *int2, const int msb2, uint *workbuf)
+{
+	/* Fallback to classic algorithm */
+	if (msb1 < KARA_CROSS && msb2 < KARA_CROSS)
+		return mul_buf_classic(intr, int1, msb1, int2, msb2);
+
+	int div = _tt_max(msb1, msb2) / 2;
+	int msb_a = 0, msb_b = msb1;
+	int msb_c = 0, msb_d = msb2;
+	if (div < msb1) {
+		msb_a = msb1 - div;
+		msb_b = get_uints(int1, div);
+	}
+	if (div < msb2) {
+		msb_c = msb2 - div;
+		msb_d = get_uints(int2, div);
+	}
+
+	/* Result = (A*C)*base^(div*2) + (A*D+B*C)*base^div + B*D */
+	int msb = 1;
+	int msb_ac = 0, msb_bd = 0;
+
+	/* B*D -> intr */
+	if (msb_b && msb_d) {
+		msb_bd = mul_buf_kara(intr, int1, msb_b, int2, msb_d, workbuf);
+		msb = msb_bd;
+	}
+
+	/* A*C -> intr+div*2 */
+	if (msb_a && msb_c) {
+		msb_ac = mul_buf_kara(intr+div*2, int1+div, msb_a,
+				int2+div, msb_c, workbuf);
+		msb = msb_ac + div*2;
+	}
+
+	/* A*D+B*C */
+	if (!((msb_a == 0 || msb_d == 0) && (msb_b == 0 || msb_c == 0))) {
+		uint *a_b = workbuf;
+		uint *c_d = a_b + (div + 2);
+		uint *ad_bc = c_d + (div + 2);
+		uint *nextbuf = ad_bc + 2 * (div + 4);
+		const int bufsz = div * 4 + 12;
+		memset(workbuf, 0, bufsz * 4);
+
+		/* A+B */
+		int msb_a_b = 1;
+		if (msb_a) {
+			memcpy(a_b, int1+div, msb_a*4);
+			msb_a_b = msb_a;
+		}
+		if (msb_b)
+			msb_a_b = add_buf(a_b, msb_a_b, int1, msb_b);
+
+		/* C+D */
+		int msb_c_d = 1;
+		if (msb_c) {
+			memcpy(c_d, int2+div, msb_c*4);
+			msb_c_d = msb_c;
+		}
+		if (msb_d)
+			msb_c_d = add_buf(c_d, msb_c_d, int2, msb_d);
+
+		/* A*D+B*C = (A+B)*(C+D)-A*C-B*D */
+		int msb_ad_bc = mul_buf_kara(ad_bc, a_b, msb_a_b, c_d, msb_c_d,
+				nextbuf);
+		if (msb_ac)
+			msb_ad_bc = sub_buf(ad_bc, msb_ad_bc, intr+div*2, msb_ac);
+		if (msb_bd)
+			msb_ad_bc = sub_buf(ad_bc, msb_ad_bc, intr, msb_bd);
+
+		/* Sum all */
+		int msb2 = msb - div;
+		if (msb2 <= 0)
+			msb2 = 1;
+		msb = add_buf(intr+div, msb2, ad_bc, msb_ad_bc) + div;
+	}
+
+	tt_assert_fa(msb == (msb1+msb2) || msb == (msb1+msb2-1));
+	return msb;
+}
+
+/* intr = int1 * int2
+ * - int1, msb, int2, msb2 must from valid tt_int
+ * - intr is zeroed on enter
+ * - return result length, -1 if no enough memory
+ */
+int _tt_int_mul_buf(uint *intr, const uint *int1, const int msb1,
+		const uint *int2, const int msb2)
+{
+	/* mul_buf_xxx cannot treat 0 correctly */
+	if ((msb1 == 1 && int1[0] == 0) || (msb2 == 1 && int2[0] == 0))
+		return 1;
+
+	/* Use classic algorithm when input below crosspoint */
+	if (msb1 < KARA_CROSS && msb2 < KARA_CROSS)
+		return mul_buf_classic(intr, int1, msb1, int2, msb2);
+
+	/* Allocate working buffer for Karatsuba algorithm */
+	const int worksz = (_tt_max(msb1, msb2) + 6) * 4;
+	uint *workbuf = malloc(worksz*4);
+	if (workbuf == NULL) {
+		tt_error("Out of memory");
+		return TT_ENOMEM;
+	}
+
+	int ret = mul_buf_kara(intr, int1, msb1, int2, msb2, workbuf);
+
+	free(workbuf);
+	return ret;
 }
 
 /* dst = src1 + src2. dst may share src1 or src2. */
