@@ -238,10 +238,8 @@ int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
 		return TT_EINVAL;
 	}
 	char *s = calloc(digs+1+2+1, 1);	/* -, 0x, \0 */
-	if (!s) {
-		tt_error("Not enough memory");
+	if (!s)
 		return TT_ENOMEM;
-	}
 	*str = s;
 
 	if (ti->_sign)

@@ -391,10 +391,8 @@ int _tt_int_mul_buf(uint *intr, const uint *int1, const int msb1,
 	/* Allocate working buffer for Karatsuba algorithm */
 	const int worksz = (_tt_max(msb1, msb2) + 6) * 4;
 	uint *workbuf = malloc(worksz*4);
-	if (workbuf == NULL) {
-		tt_error("Out of memory");
+	if (workbuf == NULL)
 		return TT_ENOMEM;
-	}
 
 	int ret = mul_buf_kara(intr, int1, msb1, int2, msb2, workbuf);
 
@@ -427,12 +425,10 @@ int tt_int_mul(struct tt_int *dst, const struct tt_int *src1,
 
 	/* Allocate result buffer */
 	uint *r = calloc(src1->_msb + src2->_msb, 4);
-	if (!r) {
-		tt_error("Out of memory");
+	if (!r)
 		return TT_ENOMEM;
-	}
 
-	int sign = src1->_sign ^ src2->_sign;
+	const int sign = src1->_sign ^ src2->_sign;
 	uint msb = _tt_int_mul_buf(r, src1->_int, src1->_msb,
 			src2->_int, src2->_msb);
 	if (dst->_max < msb) {

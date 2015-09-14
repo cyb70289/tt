@@ -20,10 +20,8 @@ int tt_int_factorial(struct tt_int *ti, const int n)
 
 	/* Allocate buffers */
 	uint *ibuf = malloc(n * 4 * 3);
-	if (ibuf == NULL) {
-		tt_error("Out of memory");
+	if (ibuf == NULL)
 		return TT_ENOMEM;
-	}
 	uint *oper = ibuf;
 	uint *result = ibuf + n;
 	int *msb = (int*)result + n;

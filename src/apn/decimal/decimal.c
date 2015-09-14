@@ -36,7 +36,7 @@ struct tt_dec *tt_dec_alloc(uint prec)
 	struct tt_dec *dec = calloc(1, sizeof(struct tt_dec));
 	dec->_dig32 = calloc(digsz, 4);
 	if (dec->_dig32 == NULL) {
-		tt_error("Not enough memory");
+		tt_error("Out of memory");
 		free(dec);
 		return NULL;
 	}

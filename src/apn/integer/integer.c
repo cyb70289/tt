@@ -17,7 +17,7 @@ struct tt_int *tt_int_alloc(void)
 	ti->_msb = 1;
 	ti->_int = calloc(ti->__sz, 4);
 	if (ti->_int == NULL) {
-		tt_error("Not enough memory");
+		tt_error("Out of memory");
 		free(ti);
 		return NULL;
 	}
@@ -45,10 +45,8 @@ int _tt_int_realloc(struct tt_int *ti, uint msb)
 
 	/* Reallocate buffer */
 	uint *_int = realloc(ti->_int, msb * 4);
-	if (!_int) {
-		tt_error("Not enough memory");
+	if (!_int)
 		return TT_ENOMEM;
-	}
 	memset(_int + ti->__sz, 0, (msb - ti->__sz) * 4);
 	ti->_int = _int;
 	*(uint *)&ti->__sz = msb;

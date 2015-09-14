@@ -491,7 +491,6 @@ static int add_sub_dec(struct tt_dec *dst, const struct tt_dec *src1,
 	/* Copy adjusted significand of src2 to temporary buffer */
 	uint *tmpdig = malloc(dst2->_digsz);
 	if (!tmpdig) {
-		tt_error("Out of memory");
 		if (dst2 != dst)
 			free(dst2);
 		return TT_ENOMEM;
@@ -621,10 +620,8 @@ int tt_dec_mul(struct tt_dec *dst, const struct tt_dec *src1,
 	 */
 	const int uints = (src1->_msb + src2->_msb + 1 + 18 + 8) / 9;
 	uint *digr = calloc(uints, 4);
-	if (!digr) {
-		tt_error("Out of memory");
+	if (!digr)
 		return TT_ENOMEM;
-	}
 
 	/* Multiply */
 	int msb = mul_digs(digr, src1->_dig32, src1->_msb,
@@ -742,7 +739,6 @@ int tt_dec_div(struct tt_dec *dst, const struct tt_dec *src1,
 	uint *dividend = calloc(uints, 4);
 	uint *divisor = calloc(uints, 4);
 	if (!dividend || !divisor) {
-		tt_error("Out of memory");
 		ret = TT_ENOMEM;
 		goto out;
 	}
