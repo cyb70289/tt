@@ -43,6 +43,9 @@
 #define _tt_weak	__attribute__ ((weak))
 #define _tt_align(n)	__attribute__ ((aligned (n)))
 
+#define _tt_barrier()	__asm__ __volatile__("": : :"memory")
+#define _tt_sync()	__sync_synchronize()
+
 /* Select key handlers (swap, set) */
 struct tt_key;
 int _tt_key_select(struct tt_key *num);

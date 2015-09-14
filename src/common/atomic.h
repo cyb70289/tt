@@ -4,24 +4,20 @@
  */
 #pragma once
 
-#define _tt_opt_barrier()	__asm__ __volatile__("": : :"memory")
-
-#define _tt_sync_barrier()	__sync_synchronize()
-
 struct _tt_atomic {
 	volatile int v;
 };
 
 static inline int _tt_atomic_get(const struct _tt_atomic *a)
 {
-	_tt_sync_barrier();
+	_tt_sync();
 	return a->v;
 }
 
 static inline void _tt_atomic_set(struct _tt_atomic *a, int i)
 {
 	a->v = i;
-	_tt_sync_barrier();
+	_tt_sync();
 }
 
 static inline int _tt_atomic_add(struct _tt_atomic *a, int i)
