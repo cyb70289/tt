@@ -56,6 +56,21 @@ int _tt_int_realloc(struct tt_int *ti, uint msb)
 	return 0;
 }
 
+int _tt_int_copy(struct tt_int *dst, const struct tt_int *src)
+{
+	_tt_int_zero(dst);
+
+	int ret = _tt_int_realloc(dst, src->_msb);
+	if (ret)
+		return ret;
+
+	dst->_sign = src->_sign;
+	dst->_msb = src->_msb;
+	memcpy(dst->_int, src->_int, src->_msb * 4);
+
+	return 0;
+}
+
 void _tt_int_zero(struct tt_int *ti)
 {
 	ti->_sign = 0;

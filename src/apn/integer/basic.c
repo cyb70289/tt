@@ -189,6 +189,24 @@ static int sub_buf(uint *int1, int msb1, const uint *int2, int msb2)
 	return i;
 }
 
+/* 1: src1 > src2, 0: src1 == src2, -1: src1 < src2 */
+static int cmp_buf(const uint *int1, int msb1, const uint *int2, int msb2)
+{
+	if (msb1 > msb2)
+		return 1;
+	else if (msb1 < msb2)
+		return -1;
+
+	for (int i = msb1-1; i >= 0; i--) {
+		if (int1[i] > int2[i])
+			return 1;
+		else if (int1[i] < int2[i])
+			return -1;
+	}
+
+	return 0;
+}
+
 #ifdef __SIZEOF_INT128__
 static int from128(uint out[5], __uint128_t i128)
 {
@@ -372,6 +390,46 @@ static int mul_buf_kara(uint *intr, const uint *int1, const int msb1,
 	return msb;
 }
 
+/* Guess quotient by high digits */
+static uint guess_quotient(const uint *_src1, int msb1,
+		const uint *_src2, int msb2)
+{
+	if (msb1 < msb2)
+		return 0;
+
+	_src1 += (msb1 - 1);
+	_src2 += (msb2 - 1);
+
+#ifdef __SIZEOF_INT128__
+	__uint128_t dividend = *_src1--;
+	if (--msb1) {
+		dividend <<= 31;
+		dividend += *_src1--;
+		if (--msb1) {
+			dividend <<= 31;
+			dividend += *_src1;
+		}
+	}
+	uint64_t divisor = *_src2--;;
+	if (--msb2) {
+		divisor <<= 31;
+		divisor += *_src2;
+	}
+#else
+	uint64_t dividend = *_src1--;
+	if (--msb1) {
+		dividend <<= 31;
+		divident += *_src1;
+	}
+	uint divisor = *_src2;
+#endif
+
+	uint q = dividend / divisor;
+	if (q >= BIT(31))
+		q = BIT(31) - 1;
+	return q;
+}
+
 /* intr = int1 * int2
  * - int1, msb, int2, msb2 must from valid tt_int
  * - intr is zeroed on enter
@@ -446,23 +504,151 @@ int tt_int_mul(struct tt_int *dst, const struct tt_int *src1,
 	return 0;
 }
 
+/* quo = src1 / src2, rem = src1 % src2.
+ * - dst, src may share src1 or src2
+ * - quo or rem may be null
+ */
+int tt_int_div(struct tt_int *quo, struct tt_int *rem,
+		const struct tt_int *src1, const struct tt_int *src2)
+{
+	int ret = 0;
+	tt_assert(quo != rem);
+
+	/* Check zero */
+	if (_tt_int_is_zero(src2))
+		return TT_APN_EDIV_0;
+
+	/* dividend < divisor */
+	if (tt_int_cmp_abs(src1, src2) < 0) {
+		if (rem && rem != src1)
+			ret = _tt_int_copy(rem, src1);
+		_tt_barrier();
+		if (quo)
+			_tt_int_zero(quo);
+		return ret;
+	}
+
+	/* Get sign of quotient and remainder */
+	const int sign_quo = src1->_sign ^ src2->_sign;
+	const int sign_rem = src1->_sign;
+
+	/* Allocate working buffer: dividend, divisor, quotient, remainder */
+	const int sz_dd = src1->_msb + 1;
+	const int sz_ds = src2->_msb;
+	const int sz_qt = sz_dd - sz_ds;
+	const int sz_tmpmul = sz_ds + 1;
+	uint *workbuf = calloc(sz_dd + sz_ds + sz_qt + sz_tmpmul, 4);
+	if (workbuf == NULL)
+		return TT_ENOMEM;
+	uint *dd = workbuf;
+	uint *ds = dd + sz_dd;
+	uint *qt = ds + sz_ds;
+	uint *tmpmul = qt + sz_qt;
+
+	int msb_dd = src1->_msb, msb_qt;
+	const int msb_ds = src2->_msb;
+
+	/* Normalize: msb(divisor) = 1 */
+	const int shift = __builtin_clz(src2->_int[src2->_msb-1]) - 1;
+	if (shift == 0) {
+		memcpy(dd, src1->_int, src1->_msb * 4);
+		memcpy(ds, src2->_int, src2->_msb * 4);
+	} else {
+		int i;
+		uint tmp = 0;
+
+		for (i = 0; i < src2->_msb; i++) {
+			ds[i] = ((src2->_int[i] << shift) | tmp) & ~BIT(31);
+			tmp = src2->_int[i] >> (31 - shift);
+		}
+		tt_assert(tmp == 0);
+
+		for (i = 0; i < src1->_msb; i++) {
+			dd[i] = ((src1->_int[i] << shift) | tmp) & ~BIT(31);
+			tmp = src1->_int[i] >> (31 - shift);
+		}
+		if (tmp) {
+			dd[i] = tmp;
+			msb_dd++;
+		}
+	}
+
+	int qt_idx, topmsb = msb_ds;
+	uint *dd_top = dd + msb_dd - msb_ds;
+
+	msb_qt = msb_dd - msb_ds;
+	qt_idx = msb_qt - 1;
+	if (cmp_buf(dd_top, msb_ds, ds, msb_ds) >= 0) {
+		/* First digit */
+		qt[msb_qt++] = 1;
+		topmsb = sub_buf(dd_top, msb_ds, ds, msb_ds);
+	}
+	if (msb_qt == 0)
+		msb_qt = 1;
+
+	while (qt_idx >= 0) {
+		if (!(topmsb == 1 && *dd_top == 0))
+			topmsb++;
+		dd_top--;
+
+		uint q = guess_quotient(dd_top, topmsb, ds, msb_ds);
+		if (q) {
+			memset(tmpmul, 0, sz_tmpmul * 4);
+			int mulmsb = mul_buf_classic(tmpmul, ds, msb_ds, &q, 1);
+			while (cmp_buf(tmpmul, mulmsb, dd_top, topmsb) > 0) {
+				mulmsb = sub_buf(tmpmul, mulmsb, ds, msb_ds);
+				q--;
+			}
+			tt_assert_fa(topmsb >= mulmsb);
+			topmsb = sub_buf(dd_top, topmsb, tmpmul, mulmsb);
+		}
+		qt[qt_idx--] = q;
+	}
+	tt_assert_fa(dd_top == dd);
+
+	/* qt[msb_qt] -> quo */
+	if (quo) {
+		_tt_int_zero(quo);
+		ret = _tt_int_realloc(quo, msb_qt);
+		if (ret)
+			goto out;
+		quo->_sign = sign_quo;
+		quo->_msb = msb_qt;
+		memcpy(quo->_int, qt, msb_qt * 4);
+	}
+
+	/* dd[topmsb]>>shift -> rem */
+	if (rem) {
+		if (shift) {
+			uint tmp = 0, tmp2;
+			for (int i = topmsb-1; i >= 0; i--) {
+				tmp2 = dd[i];
+				dd[i] = (dd[i] >> shift) | tmp;
+				tmp = (tmp2 << (31 - shift)) & ~BIT(31);
+			}
+			if (dd[topmsb-1] == 0 && topmsb > 1)
+				topmsb--;
+		}
+		_tt_int_zero(rem);
+		ret = _tt_int_realloc(rem, topmsb);
+		if (ret)
+			goto out;
+		rem->_sign = sign_rem;
+		rem->_msb = topmsb;
+		memcpy(rem->_int, dd, topmsb * 4);
+	}
+
+out:
+	free(workbuf);
+	return ret;
+}
+
 /* Compare absolute value
  * - return: 1 - src1 > src2, 0 - src1 == src2, -1 - src1 < src2
  */
 int tt_int_cmp_abs(const struct tt_int *src1, const struct tt_int *src2)
 {
-	if (src1->_msb > src2->_msb)
-		return 1;
-	else if (src1->_msb < src2->_msb)
-		return -1;
-
-	for (int i = src1->_msb-1; i >= 0; i--) {
-		if (src1->_int[i] > src2->_int[i])
-			return 1;
-		else if (src1->_int[i] < src2->_int[i])
-			return -1;
-	}
-	return 0;
+	return cmp_buf(src1->_int, src1->_msb, src2->_int, src2->_msb);
 }
 
 int tt_int_cmp(const struct tt_int *src1, const struct tt_int *src2)

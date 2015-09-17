@@ -25,6 +25,8 @@ struct tt_int {
 
 int _tt_int_realloc(struct tt_int *ti, uint msb);
 
+int _tt_int_copy(struct tt_int *dst, const struct tt_int *src);
+
 /* Clear zero */
 void _tt_int_zero(struct tt_int *ti);
 

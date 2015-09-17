@@ -24,7 +24,7 @@ static char *gen_int_str(int *radix)
 	const char *prefix[] = { "0b", "0", "", "0x", "" };
 
 	const int sign = rand() & 1;
-	const int ridx = rand() % 5;
+	const int ridx = 4;//rand() % 5;
 	const int digs = rand() % MAX_DIGS + 1;
 
 	char *str = malloc(sign + strlen(prefix[ridx]) + digs + 1);
@@ -106,7 +106,7 @@ static void verify_conv(int count)
 	tt_int_free(ti);
 }
 
-void verify_add_sub(int count)
+static void verify_add_sub(int count)
 {
 	printf("Add & Sub...\n");
 
@@ -177,6 +177,62 @@ void verify_add_sub(int count)
 	tt_int_free(t);
 }
 
+static void verify_mul_div(int count)
+{
+	printf("Mul & Div...\n");
+
+	struct tt_int *a = tt_int_alloc();
+	struct tt_int *b = tt_int_alloc();
+	struct tt_int *q = tt_int_alloc();
+	struct tt_int *r = tt_int_alloc();
+
+	for (int i = 1; i <= count; i++) {
+		if (i % 50 == 0) {
+			tt_int_free(a);
+			tt_int_free(b);
+			tt_int_free(q);
+			tt_int_free(r);
+
+			a = tt_int_alloc();
+			b = tt_int_alloc();
+			q = tt_int_alloc();
+			r = tt_int_alloc();
+		}
+
+		int ret, radix;
+		char *str;
+
+		/* Generate a, b */
+		str = gen_int_str(&radix);
+		tt_int_from_string(a, str);
+		free(str);
+		str = gen_int_str(&radix);
+		tt_int_from_string(b, str);
+		free(str);
+
+		/* q = a / b, r = a % b */
+		ret = tt_int_div(q, r, a, b);
+		assert(ret == 0 && _tt_int_sanity(q) == 0 &&
+				_tt_int_sanity(r) == 0);
+
+		/* b = q * b + r */
+		ret = tt_int_mul(b, q, b);
+		assert(ret == 0 && _tt_int_sanity(b) == 0);
+		ret = tt_int_add(b, b, r);
+
+		/* a == b */
+		if (tt_int_cmp(a, b)) {
+			tt_error("mismatch");
+			break;
+		}
+	}
+
+	tt_int_free(a);
+	tt_int_free(b);
+	tt_int_free(q);
+	tt_int_free(r);
+}
+
 int main(void)
 {
 #if 0
@@ -212,6 +268,20 @@ int main(void)
 	free(s);
 	s = NULL;
 
+	tt_int_from_string(ti1, "1111111111111111111111111111111111111111111");
+	tt_int_from_string(ti2, "1111111111111111111111111111");
+	tt_int_div(ti, ti1, ti1, ti2);
+	assert(_tt_int_sanity(ti) == 0);
+	assert(_tt_int_sanity(ti1) == 0);
+	tt_int_to_string(ti, &s, 10);
+	printf("%s\n", s);
+	free(s);
+	s = NULL;
+	tt_int_to_string(ti1, &s, 10);
+	printf("%s\n", s);
+	free(s);
+	s = NULL;
+
 	tt_int_free(ti);
 	tt_int_free(ti1);
 	tt_int_free(ti2);
@@ -240,6 +310,7 @@ int main(void)
 	const int count = 10000;
 	verify_conv(count);
 	verify_add_sub(count);
+	verify_mul_div(count);
 
 	return 0;
 }
