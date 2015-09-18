@@ -81,17 +81,21 @@ void _tt_int_zero(struct tt_int *ti)
 /* Check sanity */
 int _tt_int_sanity(const struct tt_int *ti)
 {
+	uint i;
+
 	if (ti->_msb == 0 || ti->_msb > ti->_max)
 		return TT_APN_ESANITY;
 
-	uint i;
+	/* Check significands */
+	if (ti->_msb > 1 && ti->_int[ti->_msb-1] == 0)
+		return TT_APN_ESANITY;
 
 	/* Check carry guard bit */
 	for (i = 0; i < ti->_msb; i++)
 		if ((ti->_int[i] & BIT(31)))
 			return TT_APN_ESANITY;
 
-	/* Check remaining uints */
+	/* Check unused uints */
 	for (; i < ti->__sz; i++)
 		if (ti->_int[i])
 			return TT_APN_ESANITY;
