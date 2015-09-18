@@ -401,30 +401,28 @@ static uint guess_quotient(const uint *_src1, int msb1,
 	_src2 += (msb2 - 1);
 
 #ifdef __SIZEOF_INT128__
-	__uint128_t dividend = *_src1--;
+	__uint128_t dividend;
+	uint64_t divisor;
+#else
+	double dividend, divisor;
+#endif
+
+	dividend = *_src1--;
 	if (--msb1) {
-		dividend <<= 31;
+		dividend *= BIT(31);
 		dividend += *_src1--;
 		if (--msb1) {
-			dividend <<= 31;
+			dividend *= BIT(31);
 			dividend += *_src1;
 		}
 	}
-	uint64_t divisor = *_src2--;;
+	divisor = *_src2--;;
 	if (--msb2) {
-		divisor <<= 31;
+		divisor *= BIT(31);
 		divisor += *_src2;
 	}
-#else
-	uint64_t dividend = *_src1--;
-	if (--msb1) {
-		dividend <<= 31;
-		divident += *_src1;
-	}
-	uint divisor = *_src2;
-#endif
 
-	uint q = dividend / divisor;
+	uint q = (uint)(dividend / divisor);
 	if (q >= BIT(31))
 		q = BIT(31) - 1;
 	return q;

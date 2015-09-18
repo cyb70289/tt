@@ -24,7 +24,7 @@ static char *gen_int_str(int *radix)
 	const char *prefix[] = { "0b", "0", "", "0x", "" };
 
 	const int sign = rand() & 1;
-	const int ridx = 4;//rand() % 5;
+	const int ridx = rand() % 5;
 	const int digs = rand() % MAX_DIGS + 1;
 
 	char *str = malloc(sign + strlen(prefix[ridx]) + digs + 1);
@@ -209,6 +209,12 @@ static void verify_mul_div(int count)
 		str = gen_int_str(&radix);
 		tt_int_from_string(b, str);
 		free(str);
+
+		if (a->_msb < b->_msb) {
+			void *t = a;
+			a = b;
+			b = t;
+		}
 
 		/* q = a / b, r = a % b */
 		ret = tt_int_div(q, r, a, b);
