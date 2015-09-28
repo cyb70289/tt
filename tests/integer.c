@@ -239,8 +239,26 @@ static void verify_mul_div(int count)
 	tt_int_free(r);
 }
 
+struct tt_int *rand_int(int msb)
+{
+	struct tt_int *ti = tt_int_alloc();
+	if (_tt_int_realloc(ti, msb))
+		return NULL;
+
+	ti->_msb = msb;
+	do {
+		ti->_int[0] = rand() & ~(1<<31);
+	} while (ti->_int[0] == 0);
+	for (int i = 1; i < msb; i++)
+		ti->_int[i] = rand() & ~(1<<31);
+
+	return ti;
+}
+
 int main(void)
 {
+	srand(time(NULL));
+
 #if 0
 	struct tt_int *ti = tt_int_alloc();
 
@@ -310,7 +328,23 @@ int main(void)
 	return 0;
 #endif
 
-	srand(time(NULL));
+#if 0
+	#define MSB1	3000000
+	#define MSB2	300
+	#define LOOPS	1
+
+	tt_log_set_level(TT_LOG_WARN);
+
+	struct tt_int *ti1 = rand_int(MSB1);
+	struct tt_int *ti2 = rand_int(MSB2);
+	struct tt_int *ti3 = tt_int_alloc();
+
+	for (int i = 0; i < LOOPS; i++)
+		tt_int_mul(ti3, ti1, ti2);
+
+	return 0;
+#endif
+
 	tt_log_set_level(TT_LOG_WARN);
 
 	const int count = 10000;

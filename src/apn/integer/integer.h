@@ -37,5 +37,5 @@ static inline bool _tt_int_is_zero(const struct tt_int *ti)
 
 int _tt_int_sanity(const struct tt_int *ti);
 
-int _tt_int_mul_buf(uint *intr, const uint *int1, const int msb1,
-		const uint *int2, const int msb2);
+int _tt_int_mul_buf(uint *intr, const uint *int1, int msb1,
+		const uint *int2, int msb2);
