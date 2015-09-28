@@ -12,17 +12,24 @@
 
 static char bin_to_ascii[] = "0123456789ABCDEF";
 
-static int ascii_to_bin(int v)
-{
-	if (v >= '0' && v <= '9')
-		return v - '0';
-	else if (v >= 'a' && v <= 'f')
-		return v - 'a' + 10;
-	else if (v >= 'A' && v <= 'F')
-		return v - 'A' + 10;
-	else
-		return -1;
-}
+static char ascii_to_bin[] = {
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	 0,  1,  2,  3,  4,  5,  6,  7,  8,  9, -1, -1, -1, -1, -1, -1,
+	-1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, 10, 11, 12, 13, 14, 15, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+	-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,
+};
 
 /* Divide "dividend" by 10^9 and store quotient to "quo", return remainder
  * - "dividend" = [len-1] + [len-2]*2^31 + [len-3]*2^62 + ...
@@ -98,7 +105,7 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 	/* Verify string */
 	const char *s = str;
 	while (*s) {
-		int v = ascii_to_bin(*s);
+		int v = ascii_to_bin[(uchar)*s];
 		if (v < 0 || v >= radix) {
 			tt_debug("Invalid string");
 			return TT_EINVAL;
@@ -157,7 +164,7 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 			uint dig9 = 0;
 			for (int j = 0; j < lt; j++) {
 				dig9 *= 10;
-				dig9 += ascii_to_bin(*s++);
+				dig9 += ascii_to_bin[(uchar)*s++];
 			}
 			lt = 9;
 
@@ -183,7 +190,7 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 
 		s--;	/* Last digit */
 		while (s >= str) {
-			int c = ascii_to_bin(*s);
+			int c = ascii_to_bin[(uchar)*s];
 			for (int i = radix; i > 1; i >>= 1) {
 				cur_bit++;
 				if (cur_bit == 31) {
