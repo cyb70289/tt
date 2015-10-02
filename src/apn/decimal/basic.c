@@ -207,9 +207,7 @@ static int mul_digs(uint *digr, const uint *dig1, const int msb1,
 			jmin = 0;
 
 #ifdef __SIZEOF_INT128__
-		/* uint128 may overflow if both dig are longer than
-		 * 9 * 10^20 digits. I don't think it's possible.
-		 */
+		/* XXX: int128 may overflow if both operands >= 10^(9*10^20) */
 		__uint128_t tmp128 = 0;
 		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++)
 			tmp128 += (uint64_t)dig1[j] * dig2[k];

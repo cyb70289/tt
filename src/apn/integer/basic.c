@@ -273,6 +273,7 @@ static int mul_buf_classic(uint *intr, const uint *int1, const int msb1,
 			jmin = 0;
 
 #ifdef __SIZEOF_INT128__
+		/* XXX: int128 may overflow if both operands >= 10^(10^21) */
 		__uint128_t tmp128 = 0;
 		uint tmp[5];
 		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++)
@@ -427,6 +428,38 @@ static int mul_buf_kara(uint *intr, const uint *int1, int msb1,
 
 	tt_assert_fa(msb == (msb1+msb2) || msb == (msb1+msb2-1));
 	return msb;
+}
+
+/* intr = int1 * int2
+ * - int1, msb1, int2, msb2 must from valid tt_int
+ * - intr is zeroed on enter
+ * - return result length, -1 if no enough memory
+ */
+int _tt_int_mul_buf(uint *intr, const uint *int1, int msb1,
+		const uint *int2, int msb2)
+{
+	/* mul_buf_xxx cannot treat 0 correctly */
+	if ((msb1 == 1 && int1[0] == 0) || (msb2 == 1 && int2[0] == 0))
+		return 1;
+
+	const int msbmax = _tt_max(msb1, msb2);
+
+	/* Use classic algorithm when input size below crosspoint */
+	if (msbmax < KARA_CROSS)
+		return mul_buf_classic(intr, int1, msb1, int2, msb2);
+
+	/* Allocate working buffer for Karatsuba algorithm */
+	/* recursive calls = (int)(log2(msbmax) - log2(KARA_CROSS)) + 2; */
+	const int recurse = 33 - __builtin_clz((msbmax / KARA_CROSS) + 1);
+	const int worksz = msbmax * 4 + recurse * (recurse + 9);
+	uint *workbuf = malloc(worksz * 4);
+	if (workbuf == NULL)
+		return TT_ENOMEM;
+
+	int ret = mul_buf_kara(intr, int1, msb1, int2, msb2, workbuf);
+
+	free(workbuf);
+	return ret;
 }
 
 /* Guess quotient by high digits */
@@ -589,41 +622,6 @@ static int div_buf_classic(uint *_qt, int *_msb_qt, uint *_rm, int *_msb_rm,
 
 	free(workbuf);
 	return 0;
-}
-
-/* intr = int1 * int2
- * - int1, msb1, int2, msb2 must from valid tt_int
- * - intr is zeroed on enter
- * - return result length, -1 if no enough memory
- */
-int _tt_int_mul_buf(uint *intr, const uint *int1, int msb1,
-		const uint *int2, int msb2)
-{
-	/* mul_buf_xxx cannot treat 0 correctly */
-	if ((msb1 == 1 && int1[0] == 0) || (msb2 == 1 && int2[0] == 0))
-		return 1;
-
-	const int msbmax = _tt_max(msb1, msb2);
-
-	/* Use classic algorithm when input size below crosspoint */
-	if (msbmax < KARA_CROSS)
-		return mul_buf_classic(intr, int1, msb1, int2, msb2);
-
-	/* Allocate working buffer for Karatsuba algorithm */
-#if 1
-	const int worksz = (_tt_max(msb1, msb2) + 6) * 4;
-#else
-	const uint recurse = (uint)(log2(msbmax) - log2(KARA_CROSS)) + 2;
-	const int worksz = msbmax * 4 + recurse * (recurse + 9);
-#endif
-	uint *workbuf = malloc(worksz * 4);
-	if (workbuf == NULL)
-		return TT_ENOMEM;
-
-	int ret = mul_buf_kara(intr, int1, msb1, int2, msb2, workbuf);
-
-	free(workbuf);
-	return ret;
 }
 
 /* dst = src1 + src2. dst may share src1 or src2. */
