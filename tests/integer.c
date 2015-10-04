@@ -217,7 +217,12 @@ static void verify_mul_div(int count)
 		}
 
 		/* q = a / b, r = a % b */
+#if 1
 		ret = tt_int_div(q, r, a, b);
+#else
+		ret = tt_int_div(NULL, r, a, b);
+		ret = tt_int_div(q, NULL, a, b);
+#endif
 		assert(ret == 0 && _tt_int_sanity(q) == 0 &&
 				_tt_int_sanity(r) == 0);
 

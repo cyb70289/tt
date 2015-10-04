@@ -500,81 +500,24 @@ static uint guess_quotient(const uint *_src1, int msb1,
 	return q;
 }
 
-/* Divide: _qt = _dd / _ds; _rm = _dd % _ds
- * - _qt, _rm, _msb_qt, _msb_rm may be NULL
- * - _qt: input - zeroed; output - quotient
- * - *_msb_qt: input - size of _qt[]; output - quotient msb
- * - _rm: input - zeroed; output - remainder
- * - *_msb_rm: input - size of _rm[]; output - remainder msb
- * - _dd, msb_dd: dividend
- * - _ds, msb_ds: divisor
- * - msb_dd >= msb_ds, _dd >= _ds
- */
-static int div_buf_classic(uint *_qt, int *_msb_qt, uint *_rm, int *_msb_rm,
-		const uint *_dd, int msb_dd, const uint *_ds, int msb_ds)
+/* Paramaters same as div_buf() */
+static int div_buf_classic(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
+		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
 {
-	tt_assert(_qt == NULL || *_msb_qt > (msb_dd-msb_ds));
-	tt_assert(_rm == NULL || *_msb_rm >= msb_ds);
-	tt_assert((_qt || _rm) && msb_dd >= msb_ds);
-
-	/* Reuse remainder buffer to store normalized divisor */
-	uint *qt = _qt, *ds = _rm;
-	int *msb_qt = _msb_qt, __msb_qt;
-	if (msb_qt == NULL)
-		msb_qt = &__msb_qt;	/* Just to simplify code */
-
-	/* Shift bits to normalize divisor */
-	const int shift = __builtin_clz(_ds[msb_ds-1]) - 1;
-	if (shift == 0)
-		ds = (uint *)_ds;
-
 	/* Allocate working buffer */
-	const int sz_dd = msb_dd + 1;
-	const int sz_tmpmul = sz_dd + 1;
-	int sz_qt = 0, sz_ds = 0;
-	if (qt == NULL)
-		sz_qt = msb_dd - msb_ds + 1;
-	if (ds == NULL)
-		sz_ds = msb_ds;
-
-	uint *workbuf = calloc(sz_dd + sz_tmpmul + sz_qt + sz_ds, 4);
+	const int sz_tmpmul = msb_dd + 1;
+	uint *workbuf = malloc((msb_dd + sz_tmpmul) * 4);
 	if (workbuf == NULL)
 		return TT_ENOMEM;
-	uint *dd = workbuf;
-	uint *tmpmul = dd + sz_dd;
-	if (qt == NULL)
-		qt = tmpmul + sz_tmpmul;
-	if (ds == NULL)
-		ds = tmpmul + sz_tmpmul + sz_qt;
+	uint *_dd = workbuf;
+	uint *tmpmul = _dd + msb_dd;
 
-	/* Normalize: msb(divisor) = 1 */
-	if (shift == 0) {
-		memcpy(dd, _dd, msb_dd * 4);
-	} else {
-		int i;
-		uint tmp = 0;
+	memcpy(_dd, dd, msb_dd * 4);
 
-		for (i = 0; i < msb_ds; i++) {
-			ds[i] = ((_ds[i] << shift) | tmp) & ~BIT(31);
-			tmp = _ds[i] >> (31 - shift);
-		}
-		tt_assert(tmp == 0);
-
-		for (i = 0; i < msb_dd; i++) {
-			dd[i] = ((_dd[i] << shift) | tmp) & ~BIT(31);
-			tmp = _dd[i] >> (31 - shift);
-		}
-		if (tmp) {
-			dd[i] = tmp;
-			msb_dd++;
-		}
-	}
-
-	int qt_idx, topmsb = msb_ds;
-	uint *dd_top = dd + msb_dd - msb_ds;
+	int qt_idx = msb_dd - msb_ds - 1, topmsb = msb_ds;
+	uint *dd_top = _dd + msb_dd - msb_ds;
 
 	*msb_qt = msb_dd - msb_ds;
-	qt_idx = *msb_qt - 1;
 	if (cmp_buf(dd_top, msb_ds, ds, msb_ds) >= 0) {
 		/* First digit */
 		qt[(*msb_qt)++] = 1;
@@ -599,29 +542,94 @@ static int div_buf_classic(uint *_qt, int *_msb_qt, uint *_rm, int *_msb_rm,
 			tt_assert_fa(topmsb >= mulmsb);
 			topmsb = sub_buf(dd_top, topmsb, tmpmul, mulmsb);
 		}
-		qt[qt_idx--] = q;
+		qt[qt_idx] = q;
+		qt_idx--;
 	}
-	tt_assert_fa(dd_top == dd);
+	tt_assert_fa(dd_top == _dd);
 
-	/* dd[topmsb]>>shift -> remainder */
-	if (_rm) {
-		if (shift) {
-			uint tmp = 0, tmp2;
-			for (int i = topmsb-1; i >= 0; i--) {
-				tmp2 = dd[i];
-				dd[i] = (dd[i] >> shift) | tmp;
-				tmp = (tmp2 << (31 - shift)) & ~BIT(31);
-			}
-			if (dd[topmsb-1] == 0 && topmsb > 1)
-				topmsb--;
-		}
-		tt_assert_fa(topmsb <= msb_ds);
-		memcpy(_rm, dd, topmsb * 4);
-		*_msb_rm = topmsb;
-	}
+	/* remainder */
+	tt_assert_fa(topmsb <= msb_ds);
+	memcpy(rm, _dd, topmsb * 4);
+	*msb_rm = topmsb;
 
 	free(workbuf);
 	return 0;
+}
+
+/* Divide and conquer division. Paramaters same as div_buf(). */
+static int div_buf_bin(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
+		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
+{
+	/* TODO */
+	return div_buf_classic(qt, msb_qt, rm, msb_rm, dd, msb_dd, ds, msb_ds);
+}
+
+/* Divide: qt = dd / ds; rm = dd % ds
+ * - dividend >= divisor
+ * - divisor is normalized
+ * - qt/rm: quotient/remainder, zeroed on enter, must be large enough
+ * - msb_qt/msb_rm: quotient/remainder msb
+ */
+static int div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
+		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
+{
+	if (msb_dd <= msb_ds*2)
+		return div_buf_bin(qt, msb_qt, rm, msb_rm, dd, msb_dd, ds, msb_ds);
+
+	int ret;
+	int _msb_qt, _msb_rm = 0;
+	int offset = msb_dd - msb_ds*2;
+
+	*msb_qt = 0;	/* Invalidate */
+
+	/* Temporary dividend buffer */
+	uint *_dd = malloc(msb_ds*2*4);
+	memcpy(_dd, dd+offset, msb_ds*2*4);
+
+	while (1) {
+		/* Partial division */
+		ret = div_buf_bin(qt+offset, &_msb_qt, rm, &_msb_rm,
+				_dd, msb_ds*2, ds, msb_ds);
+		if (ret)
+			goto out;
+
+		/* Calculate quotient MSB on first division */
+		if (*msb_qt == 0)
+			*msb_qt = _msb_qt + offset;
+
+		/* Get next dividend MSB */
+		if (_msb_rm == 1 && rm[0] == 0)
+			_msb_rm = 0;
+		msb_dd = offset + _msb_rm;
+		offset -= (msb_ds*2 - _msb_rm);
+		if (offset <= 0)
+			break;
+
+		/* Combine remainder to next dividend */
+		memcpy(_dd, dd+offset, (msb_ds*2-_msb_rm)*4);
+		memcpy(_dd+msb_ds*2-_msb_rm, rm, _msb_rm*4);
+		memset(rm, 0, msb_ds*4);
+	}
+
+	/* Last division */
+	tt_assert(msb_dd <= msb_ds*2);
+	memcpy(_dd, dd, (msb_dd-_msb_rm)*4);
+	memcpy(_dd+msb_dd-_msb_rm, rm, _msb_rm*4);
+	memset(_dd+msb_dd, 0, (msb_ds*2-msb_dd)*4);
+	if (cmp_buf(_dd, msb_dd, ds, msb_ds) >= 0) {
+		memset(rm, 0, msb_ds*4);
+		ret = div_buf_bin(qt, &_msb_qt, rm, msb_rm,
+				_dd, msb_dd, ds, msb_ds);
+	} else {
+		memcpy(rm, _dd, msb_dd*4);
+		memset(rm+msb_dd, 0, (msb_ds-msb_dd)*4);
+		*msb_rm = msb_dd;
+		ret = 0;
+	}
+
+out:
+	free(_dd);
+	return ret;
 }
 
 /* dst = src1 + src2. dst may share src1 or src2. */
@@ -698,24 +706,52 @@ int tt_int_div(struct tt_int *quo, struct tt_int *rem,
 	const int sign_quo = src1->_sign ^ src2->_sign;
 	const int sign_rem = src1->_sign;
 
-	/* Allocate working buffer: quotient, remainder */
+	/* Get shift bits to normalize divisor */
+	const int shift = __builtin_clz(src2->_int[src2->_msb-1]) - 1;
+
+	/* Working buffer for quotient, remainder */
 	uint *qt = NULL, *rm = NULL;
-	int msb_qt = src1->_msb - src2->_msb + 1, msb_rm = src2->_msb;
-	if (quo == NULL)
-		msb_qt = 0;
-	if (rem == NULL)
-		msb_rm = 0;
-	uint *workbuf = calloc(msb_qt + msb_rm, 4);
+	int msb_qt = src1->_msb - src2->_msb + 2;
+	int msb_rm = src2->_msb;
+
+	/* Working buffer for normalized dividend, divisor */
+	uint *ds = (uint *)src2->_int;
+	uint *dd = (uint *)src1->_int;
+	int msb_ds = src2->_msb;
+	int msb_dd = src1->_msb;
+
+	/* Allocate working buffer */
+	uint *workbuf;
+	if (shift)
+		workbuf = calloc(msb_qt + msb_rm + msb_ds + msb_dd + 1, 4);
+	else
+		workbuf = calloc(msb_qt + msb_rm, 4);
 	if (workbuf == NULL)
 		return TT_ENOMEM;
-	if (quo)
-		qt = workbuf;
-	if (rem)
-		rm = workbuf + msb_qt;
+	qt = workbuf;
+	rm = workbuf + msb_qt;
+	if (shift) {
+		/* Normalize */
+		ds = workbuf + msb_qt + msb_rm;
+		dd = ds + msb_ds;
+
+		uint tmp = 0;
+		for (int i = 0; i < msb_ds; i++) {
+			ds[i] = ((src2->_int[i] << shift) | tmp) & ~BIT(31);
+			tmp = src2->_int[i] >> (31 - shift);
+		}
+
+		tt_assert(tmp == 0);
+		for (int i = 0; i < msb_dd; i++) {
+			dd[i] = ((src1->_int[i] << shift) | tmp) & ~BIT(31);
+			tmp = src1->_int[i] >> (31 - shift);
+		}
+		if (tmp)
+			dd[msb_dd++] = tmp;
+	}
 
 	/* Do division */
-	ret = div_buf_classic(qt, &msb_qt, rm, &msb_rm,
-		src1->_int, src1->_msb, src2->_int, src2->_msb);
+	ret = div_buf(qt, &msb_qt, rm, &msb_rm, dd, msb_dd, ds, msb_ds);
 	if (ret)
 		goto out;
 
@@ -736,6 +772,16 @@ int tt_int_div(struct tt_int *quo, struct tt_int *rem,
 		ret = _tt_int_realloc(rem, msb_rm);
 		if (ret)
 			goto out;
+		if (shift) {
+			uint tmp = 0, tmp2;
+			for (int i = msb_rm-1; i >= 0; i--) {
+				tmp2 = rm[i];
+				rm[i] = (rm[i] >> shift) | tmp;
+				tmp = (tmp2 << (31 - shift)) & ~BIT(31);
+			}
+			if (rm[msb_rm-1] == 0 && msb_rm > 1)
+				msb_rm--;
+		}
 		rem->_sign = sign_rem;
 		rem->_msb = msb_rm;
 		memcpy(rem->_int, rm, msb_rm * 4);
