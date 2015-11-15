@@ -10,7 +10,8 @@
 #include <string.h>
 #include <math.h>
 
-#define KARA_CROSS	200	/* Karatsuba/classic cross point */
+#define KARA_CROSS	200	/* Karatsuba multiplication cross point */
+#define BINDIV_CROSS	16	/* Divide and conquer division cross point */
 
 /* Add two int and carry
  * - i1, i2 < 2^31
@@ -250,6 +251,16 @@ static int get_uints(const uint *ui, int len)
 		len--;
 	}
 	return 0;
+}
+
+static int get_msb(const uint *ui, int len)
+{
+	while (len) {
+		if (ui[len-1])
+			return len;
+		len--;
+	}
+	return 1;
 }
 
 /* Classic multiplication
@@ -556,25 +567,191 @@ static int div_buf_classic(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 	return 0;
 }
 
-/* Divide and conquer division. Paramaters same as div_buf(). */
+/* Divide and conquer division
+ * - Paramaters same as div_buf()
+ * - msb_dd <= msb_ds*2
+ */
 static int div_buf_bin(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
 {
-	/* TODO */
-	return div_buf_classic(qt, msb_qt, rm, msb_rm, dd, msb_dd, ds, msb_ds);
+	int ret = 0;
+	const int m = msb_dd - msb_ds, h = m / 2;
+
+	if (m < BINDIV_CROSS)
+		return div_buf_classic(qt, msb_qt, rm, msb_rm,
+				dd, msb_dd, ds, msb_ds);
+
+	/* Working buffer
+	 *
+	 * - For high quotient
+	 *   +------------------------+-------------------------+
+	 *   |         nextdd         |          qt_ds          |
+	 *   +------------------------+-------------------------+
+	 *   |<----- msb_ds+h+1 ----->|<-- msb_dd-msb_ds+h+2 -->|
+	 *
+	 * - For low quotient
+	 *   +------------------------+----------+---------+
+	 *   |         nextdd         |   qt_ds  |   qtl   |
+	 *   +------------------------+----------+---------+
+	 *   |<----- msb_ds+h+1 ----->|<- 2h+2 ->|<- h+2 ->|
+	 */
+	const int bufsz = msb_ds + h*4 + 5;
+	uint *workbuf = calloc(bufsz, 4);
+	if (workbuf == NULL)
+		return TT_ENOMEM;
+	uint *nextdd = workbuf, *nextdd_rm = nextdd + h*2;
+	uint *qt_ds = nextdd + msb_ds + h + 1;
+	uint *qtl = qt_ds + h*2 + 2;
+
+	/* Guess higher part quotient
+	 *
+	 * - Dividend:
+	 *   +-----------------+-------------+
+	 *   |       dd1       |     dd0     |
+	 *   +-----------------+-------------+
+	 *   |                 |<--- h*2 --->|
+	 *   |<--------- msb_dd ------------>|
+	 *
+	 * - Divisor:
+	 *   +---------+-------+
+	 *   |   ds1   |  ds0  |
+	 *   +---------+-------+
+	 *   |         |<- h ->|
+	 *   |<--- msb_ds ---->|
+	 *
+	 * - (qt, rm) = dd1 .divide. ds1
+	 *   qt_max_size = msb_dd - msb_ds - h + 2 (one extra word)
+	 *   rm_max_size = msb_ds - h
+	 */
+	int msb_qth, msb_rmh;
+	uint *qth = qt + h;
+
+	ret = div_buf_bin(qth, &msb_qth, nextdd_rm, &msb_rmh,
+			dd+h*2, msb_dd-h*2, ds+h, msb_ds-h);
+	if (ret)
+		goto out;
+
+	/* Adjust quotient (Next dividend >= Quotient*Divisor)
+	 *
+	 * - Next dividend (max_size = msb_ds + h + 1) (one extra word)
+	 *   +------+-------------+
+	 *   |  rm  |     dd0     |
+	 *   +------+-------------+
+	 *          |<--- h*2 --->|
+	 *
+	 * - Quotient*Divisor (max_size = msb_dd - msb_ds + h + 2)
+	 *   +------------+-------+
+	 *   |  qt * ds0  |   0   |
+	 *   +------------+-------+
+	 *                |<- h ->|
+	 */
+	memcpy(nextdd, dd, h*2*4);
+	int msb_nextdd = get_msb(nextdd, msb_rmh + h*2);
+	int msb_qt_ds = _tt_int_mul_buf(qt_ds+h, qth, msb_qth,
+			ds, get_msb(ds, h)) + h;
+	msb_qt_ds = get_msb(qt_ds, msb_qt_ds);
+
+	while (cmp_buf(nextdd, msb_nextdd, qt_ds, msb_qt_ds) < 0) {
+		const uint one = 1;
+		msb_qth = sub_buf(qth, msb_qth, &one, 1);
+		if (msb_qt_ds > h &&
+				cmp_buf(qt_ds+h, msb_qt_ds-h, ds, msb_ds) > 0) {
+			/* Decrease subtrahend */
+			msb_qt_ds = sub_buf(qt_ds+h, msb_qt_ds-h, ds, msb_ds) + h;
+		} else {
+			/* Increase minuend */
+			int msb_tmp = msb_nextdd - h;
+			if (msb_tmp <= 0)
+				msb_tmp = 1;
+			msb_nextdd = add_buf(nextdd+h, msb_tmp, ds, msb_ds) + h;
+			break;
+		}
+	}
+	msb_nextdd = sub_buf(nextdd, msb_nextdd, qt_ds, msb_qt_ds);
+
+	/* Clear used buffer */
+	memset(qt_ds+h, 0, (msb_dd-msb_ds+2)*4);
+
+	/* Get lower part quotient
+	 *
+	 * - Next dividend (max_size = msb_ds + h + 1)
+	 *   +--------------+----------+
+	 *   |   next_dd1   | next_dd0 |
+	 *   +--------------+----------+
+	 *                  |<-- h --->|
+	 *
+	 * - (qt, rm) = next_dd1 .divide. ds1
+	 *   qt_max_size = h + 2 (one extra word)
+	 *   rm_max_size = msb_ds - h + 1 (one extra word)
+	 */
+	int msb_qtl, msb_rml;
+	uint *rml = rm + h;
+
+	if (msb_nextdd > h &&
+			cmp_buf(nextdd+h, msb_nextdd-h, ds+h, msb_ds-h) >= 0) {
+		ret = div_buf_bin(qtl, &msb_qtl, rml, &msb_rml,
+				nextdd+h, msb_nextdd-h, ds+h, msb_ds-h);
+		if (ret)
+			goto out;
+	} else {
+		msb_qtl = msb_rml = 1;
+		if (msb_nextdd > h) {
+			msb_rml = msb_nextdd - h;
+			memcpy(rml, nextdd+h, msb_rml*4);
+		}
+	}
+
+	/* Adjust quotient (Remainder >= Quotient*Divisor)
+	 *
+	 * - Remainder (maxsize = msb_ds)
+	 *   +-------+----------+
+	 *   |  rml  | next_dd0 |
+	 *   +-------+----------+
+	 *           |<-- h --->|
+	 *
+	 * - Quotient*Divisor (maxize = 2h+2)
+	 *   +---------+
+	 *   | qtl*ds0 |
+	 *   +---------+
+	 */
+	memcpy(rm, nextdd, h*4);
+	msb_rml = get_msb(rm, msb_rml+h);
+	msb_qt_ds = _tt_int_mul_buf(qt_ds, qtl, msb_qtl, ds, get_msb(ds, h));
+
+	while (cmp_buf(rm, msb_rml, qt_ds, msb_qt_ds) < 0) {
+		const uint one = 1;
+		msb_qtl = sub_buf(qtl, msb_qtl, &one, 1);
+		if (cmp_buf(qt_ds, msb_qt_ds, ds, msb_ds) > 0) {
+			/* Decrease subtrahend */
+			msb_qt_ds = sub_buf(qt_ds, msb_qt_ds, ds, msb_ds);
+		} else {
+			/* Increase minuend */
+			msb_rml = add_buf(rm, msb_rml, ds, msb_ds);
+			break;
+		}
+	}
+	*msb_rm = sub_buf(rm, msb_rml, qt_ds, msb_qt_ds);
+
+	*msb_qt = add_buf(qt, msb_qth+h, qtl, msb_qtl);
+
+out:
+	free(workbuf);
+	return ret;
 }
 
 /* Divide: qt = dd / ds; rm = dd % ds
  * - dividend >= divisor
  * - divisor is normalized
- * - qt/rm: quotient/remainder, zeroed on enter, must be large enough
+ * - qt: quotient, zeroed, size = max_quotient_words + 1
+ * - rm: remainder, zeroed, size = max_remainder_words
  * - msb_qt/msb_rm: quotient/remainder msb
  */
 static int div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
 {
 	if (msb_dd <= msb_ds*2)
-		return div_buf_bin(qt, msb_qt, rm, msb_rm, dd, msb_dd, ds, msb_ds);
+		return div_buf_bin(qt, msb_qt, rm, msb_rm,
+				dd, msb_dd, ds, msb_ds);
 
 	int ret;
 	int _msb_qt, _msb_rm = 0;
@@ -711,8 +888,8 @@ int tt_int_div(struct tt_int *quo, struct tt_int *rem,
 
 	/* Working buffer for quotient, remainder */
 	uint *qt = NULL, *rm = NULL;
-	int msb_qt = src1->_msb - src2->_msb + 2;
-	int msb_rm = src2->_msb;
+	int msb_qt = src1->_msb - src2->_msb + 2;	/* one extra word */
+	int msb_rm = src2->_msb + 1;			/* " */
 
 	/* Working buffer for normalized dividend, divisor */
 	uint *ds = (uint *)src2->_int;
