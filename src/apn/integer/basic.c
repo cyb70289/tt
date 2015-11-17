@@ -11,7 +11,7 @@
 #include <math.h>
 
 #define KARA_CROSS	200	/* Karatsuba multiplication cross point */
-#define BINDIV_CROSS	16	/* Divide and conquer division cross point */
+#define BINDIV_CROSS	9	/* Divide and conquer division cross point */
 
 /* Add two int and carry
  * - i1, i2 < 2^31
@@ -516,7 +516,7 @@ static int div_buf_classic(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
 {
 	/* Allocate working buffer */
-	const int sz_tmpmul = msb_dd + 1;
+	const int sz_tmpmul = msb_ds + 1;
 	uint *workbuf = malloc((msb_dd + sz_tmpmul) * 4);
 	if (workbuf == NULL)
 		return TT_ENOMEM;
@@ -749,6 +749,10 @@ out:
 static int div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
 {
+	if (msb_ds < BINDIV_CROSS)
+		return div_buf_classic(qt, msb_qt, rm, msb_rm,
+				dd, msb_dd, ds, msb_ds);
+
 	if (msb_dd <= msb_ds*2)
 		return div_buf_bin(qt, msb_qt, rm, msb_rm,
 				dd, msb_dd, ds, msb_ds);
