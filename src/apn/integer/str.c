@@ -10,6 +10,8 @@
 #include <string.h>
 #include <math.h>
 
+#include "str-dec9.c"
+
 static char bin_to_ascii[] = "0123456789ABCDEF";
 
 static char ascii_to_bin[] = {
@@ -32,42 +34,123 @@ static char ascii_to_bin[] = {
 };
 
 /* Divide "dividend" by 10^9 and store quotient to "quo", return remainder
- * - "dividend" = [len-1] + [len-2]*2^31 + [len-3]*2^62 + ...
- * - Each uint in "dividend" = 0 ~ 2^31-1
- * - Low uint in "dividend" and "quo" means higher digits
  * - *len = valid uints in "dividend" on entry, valid uints in "quo" on exit
  * - "quo" is zeroed on entry
  */
-static uint bin_div1b(const uint *dividend, uint *quo, uint *len)
+static uint div_dec9(const uint *dividend, uint *quo, int *len)
 {
 	const int uints = *len;
-	tt_assert_fa(uints && dividend[0]);
 
-	int i = 0;
+	const uint *ddptr = dividend + uints - 1;
 	uint64_t rem = 0;
 
 	/* First quotient digit */
-	while (*len) {
-		rem *= BIT(31);
-		rem += dividend[i];
-		i++;
-		if (rem >= 1000000000) {
-			quo[0] = rem / 1000000000;
-			rem %= 1000000000;
-			break;
-		}
+	if (*ddptr < 1000000000) {
+		rem = *ddptr;
+		ddptr--;
 		(*len)--;
 	}
 
 	/* Other quotient digits */
-	for (int j = 1; i < uints; i++, j++) {
-		uint64_t d = dividend[i];
-		d += rem * BIT(31);
-		quo[j] = d / 1000000000;
-		rem = d % 1000000000;
+	for (int i = *len-1; i >= 0; i--) {
+		rem *= BIT(31);
+		rem += *ddptr--;
+		quo[i] = rem / 1000000000;
+		rem %= 1000000000;
 	}
 
 	return rem;
+}
+
+/* Integer to decimal conversion
+ * - 9 decimal digits are packed to one uint
+ * - _int, msb: integer to be converted, must have one extra word
+ * - dec buffer must be large enough
+ */
+static int int_to_dec(uint *_int, int msb_int, uint *dec, int msb_dec)
+{
+	/* Adopt classic way on small input */
+	if (msb_int < dec9[DEC9_CROSS_IDX].msb * 2) {
+		if (msb_int == 1 && _int[0] == 0)
+			return 0;
+
+		int len = 0;
+		uint *workbuf = malloc(msb_int * 4);
+		uint *quo = workbuf;
+
+		/* Divide 10^9 till quotient = 0 */
+		while (msb_int) {
+			memset(quo, 0, msb_int * 4);
+			dec[len++] = div_dec9(_int, quo, &msb_int);
+			__tt_swap(_int, quo);
+		}
+		tt_assert_fa(len <= msb_dec);
+
+		free(workbuf);
+		return 0;
+	}
+
+	/* Adopt divide & conquer approach */
+	int ret = 0;
+
+	/* Pick max radix */
+	int idx = ARRAY_SIZE(dec9) - 1;
+	while (idx > DEC9_CROSS_IDX) {
+		if (msb_int >= dec9[idx].msb * 2)
+			break;
+		idx--;
+	}
+
+	/* Shift dividend to match normalized divisor */
+	const int dec9_shift = dec9[idx].shift;
+	if (dec9_shift) {
+		uint tmp = 0, tmp2;
+		for (int i = 0; i < msb_int; i++) {
+			tmp2 = _int[i];
+			_int[i] = ((_int[i] << dec9_shift) | tmp) & ~BIT(31);
+			tmp = tmp2 >> (31 - dec9_shift);
+		}
+		if (tmp)
+			_int[msb_int++] = tmp;
+	}
+
+	/* Allocate working buffer */
+	int msb_qt = msb_int - dec9[idx].msb + 2;	/* One extra word */
+	int msb_rm = dec9[idx].msb + 1;			/* " */
+	void *workbuf = calloc(msb_qt + msb_rm, 4);
+	if (!workbuf)
+		return TT_ENOMEM;
+	uint *qt = workbuf;
+	uint *rm = qt + msb_qt;
+
+	/* Divide 10^n */
+	ret = _tt_int_div_buf(qt, &msb_qt, rm, &msb_rm,
+			_int, msb_int, dec9[idx]._int, dec9[idx].msb);
+	if (ret)
+		goto out;
+
+	/* Shift remainder back */
+	if (dec9_shift) {
+		uint tmp = 0, tmp2;
+		for (int i = msb_rm-1; i >= 0; i--) {
+			tmp2 = rm[i];
+			rm[i] = (rm[i] >> dec9_shift) | tmp;
+			tmp = (tmp2 << (31 - dec9_shift)) & ~BIT(31);
+		}
+		if (rm[msb_rm-1] == 0 && msb_rm > 1)
+			msb_rm--;
+	}
+
+	/* Combine */
+	const int msb_dec9 = 1 << idx;
+	ret = int_to_dec(rm, msb_rm, dec, msb_dec9);
+	if (ret)
+		goto out;
+	ret = int_to_dec(qt, msb_qt, dec + msb_dec9, msb_dec - msb_dec9);
+
+out:
+	free(workbuf);
+	return ret;
 }
 
 int tt_int_from_string(struct tt_int *ti, const char *str)
@@ -263,38 +346,66 @@ int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
 
 	/* Integer to string conversion */
 	if (radix == 10) {
-		uint len = ti->_msb;
-		uint *dividend = malloc(len * 4);
-		uint *quo = malloc(len * 4);
-		char *dec = malloc(digs + 10);
-		char *pd = dec + digs + 9;
-		*pd-- = '\0';
+		int msb_int = ti->_msb + 1;
+		int msb_dec = (digs + 8) / 9 + 1;
+		void *workbuf = calloc(msb_int + msb_dec, 4);
+		if (!workbuf)
+			return TT_ENOMEM;
+		uint *intbuf = workbuf;
+		uint *decbuf = intbuf + msb_int;
 
-		/* Lower dividend stores higher digs */
-		for (uint i = 0; i < len; i++)
-			dividend[i] = ti->_int[len-1-i];
-
-		/* Divide 10^9 till quotient = 0 */
-		while (len) {
-			memset(quo, 0, len * 4);
-			uint rem = bin_div1b(dividend, quo, &len);
-			for (int i = 0; i < 9; i++) {
-				*pd-- = bin_to_ascii[rem % 10];
-				rem /= 10;
-			}
-			__tt_swap(dividend, quo);
+		memcpy(intbuf, ti->_int, ti->_msb * 4);
+		int err = int_to_dec(intbuf, ti->_msb, decbuf, msb_dec);
+		if (err) {
+			free(workbuf);
+			return err;
 		}
-		pd++;
 
-		/* Copy to string buffer(strip leading zeros) */
-		while (*pd == '0')
-			pd++;
-		tt_assert(strlen(pd));
-		strcpy(s, pd);
+		int i, skip_leading_zero = 1;
 
-		free(dividend);
-		free(quo);
-		free(dec);
+		/* skip leading zero */
+		for (i = msb_dec-1; i >= 0; i--) {
+			if (!skip_leading_zero)
+				break;
+
+			double d = decbuf[i];
+			d /= 100000000;
+
+			for (int j = 0; j < 9; j++) {
+				d += 0.000000001;
+				int k = (int)d;
+				d -= k;
+				d *= 10;
+
+				int c = bin_to_ascii[k];
+				if (skip_leading_zero) {
+					if (c != '0') {
+						skip_leading_zero = 0;
+						*s++ = c;
+					}
+				} else {
+					*s++ = c;
+				}
+			}
+		}
+
+		/* Remaining digits */
+		for (; i >= 0; i--) {
+			double d = decbuf[i];
+			d /= 100000000;
+
+			for (int j = 0; j < 9; j++) {
+				d += 0.000000001;
+				int k = (int)d;
+				d -= k;
+				d *= 10;
+
+				*s++ = bin_to_ascii[k];
+			}
+		}
+		*s = '\0';
+
+		free(workbuf);
 	} else {
 		/* Get total digits */
 		int i;

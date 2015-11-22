@@ -477,8 +477,10 @@ int _tt_int_mul_buf(uint *intr, const uint *int1, int msb1,
 static uint guess_quotient(const uint *_src1, int msb1,
 		const uint *_src2, int msb2)
 {
-	if (msb1 < msb2)
+	if (cmp_buf(_src1, msb1, _src2, msb2) < 0)
 		return 0;
+	else if (msb1 == msb2)
+		return 1;
 
 	_src1 += (msb1 - 1);
 	_src2 += (msb2 - 1);
@@ -506,12 +508,11 @@ static uint guess_quotient(const uint *_src1, int msb1,
 	}
 
 	uint q = (uint)(dividend / divisor);
-	if (q >= BIT(31))
-		q = BIT(31) - 1;
+	tt_assert_fa(q < BIT(31));
 	return q;
 }
 
-/* Paramaters same as div_buf() */
+/* Paramaters same as _tt_int_div_buf() */
 static int div_buf_classic(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
 {
@@ -546,6 +547,7 @@ static int div_buf_classic(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		if (q) {
 			memset(tmpmul, 0, sz_tmpmul * 4);
 			int mulmsb = mul_buf_classic(tmpmul, ds, msb_ds, &q, 1);
+
 			while (cmp_buf(tmpmul, mulmsb, dd_top, topmsb) > 0) {
 				mulmsb = sub_buf(tmpmul, mulmsb, ds, msb_ds);
 				q--;
@@ -568,7 +570,7 @@ static int div_buf_classic(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 }
 
 /* Divide and conquer division
- * - Paramaters same as div_buf()
+ * - Paramaters same as _tt_int_div_buf()
  * - msb_dd <= msb_ds*2
  */
 static int div_buf_bin(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
@@ -746,7 +748,7 @@ out:
  * - rm: remainder, zeroed, size = max_remainder_words
  * - msb_qt/msb_rm: quotient/remainder msb
  */
-static int div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
+int _tt_int_div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
 {
 	if (msb_ds < BINDIV_CROSS)
@@ -769,10 +771,17 @@ static int div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 
 	while (1) {
 		/* Partial division */
-		ret = div_buf_bin(qt+offset, &_msb_qt, rm, &_msb_rm,
-				_dd, msb_ds*2, ds, msb_ds);
-		if (ret)
-			goto out;
+		int _msb_dd = get_msb(_dd, msb_ds*2);
+		if (cmp_buf(_dd, _msb_dd, ds, msb_ds) >= 0) {
+			ret = div_buf_bin(qt+offset, &_msb_qt, rm, &_msb_rm,
+					_dd, _msb_dd, ds, msb_ds);
+			if (ret)
+				goto out;
+		} else {
+			_msb_qt = 1;
+			_msb_rm = msb_ds;
+			memcpy(rm, ds, msb_ds*4);
+		}
 
 		/* Calculate quotient MSB on first division */
 		if (*msb_qt == 0)
@@ -797,6 +806,7 @@ static int div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 	memcpy(_dd, dd, (msb_dd-_msb_rm)*4);
 	memcpy(_dd+msb_dd-_msb_rm, rm, _msb_rm*4);
 	memset(_dd+msb_dd, 0, (msb_ds*2-msb_dd)*4);
+	msb_dd = get_msb(_dd, msb_dd);
 	if (cmp_buf(_dd, msb_dd, ds, msb_ds) >= 0) {
 		memset(rm, 0, msb_ds*4);
 		ret = div_buf_bin(qt, &_msb_qt, rm, msb_rm,
@@ -932,7 +942,7 @@ int tt_int_div(struct tt_int *quo, struct tt_int *rem,
 	}
 
 	/* Do division */
-	ret = div_buf(qt, &msb_qt, rm, &msb_rm, dd, msb_dd, ds, msb_ds);
+	ret = _tt_int_div_buf(qt, &msb_qt, rm, &msb_rm, dd, msb_dd, ds, msb_ds);
 	if (ret)
 		goto out;
 

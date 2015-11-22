@@ -39,3 +39,5 @@ int _tt_int_sanity(const struct tt_int *ti);
 
 int _tt_int_mul_buf(uint *intr, const uint *int1, int msb1,
 		const uint *int2, int msb2);
+int _tt_int_div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
+		const uint *dd, int msb_dd, const uint *ds, int msb_ds);

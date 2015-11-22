@@ -260,6 +260,35 @@ struct tt_int *rand_int(int msb)
 	return ti;
 }
 
+void gen_exp10(int e)
+{
+	char *s = malloc(e+2);
+	memset(s+1, '0', e);
+	s[0] = '1';
+	s[e+1] = '\0';
+
+	struct tt_int *ti = tt_int_alloc();
+	tt_int_from_string(ti, s);
+
+	const int shift = __builtin_clz(ti->_int[ti->_msb-1]) - 1;
+	printf("#define dec9_shift_%d\t%d\n", e/9, shift);
+
+	int c = 0, sh = 0;
+	printf("static const uint dec9_norm_%d[] = {", e/9);
+	for (int i = 0; i < ti->_msb; i++) {
+		if (c == 0)
+			printf("\n\t");
+		printf("0x%08X,", ((ti->_int[i] << shift) | sh) & ~(1 << 31));
+		sh = ti->_int[i] >> (31 - shift);
+		c++;
+		if (c == 6)
+			c = 0;
+		else
+			printf(" ");
+	}
+	printf("\n};\n\n");
+}
+
 int main(void)
 {
 	srand(time(NULL));
@@ -324,7 +353,7 @@ int main(void)
 	struct tt_int *ti = tt_int_alloc();
 	tt_int_factorial(ti, 100000);
 	char *s = NULL;
-	tt_info("Coverting...");
+	tt_info("Converting...");
 	tt_int_to_string(ti, &s, 10);
 	printf("%s\n", s);
 	free(s);
@@ -347,6 +376,13 @@ int main(void)
 	for (int i = 0; i < LOOPS; i++)
 		tt_int_mul(ti3, ti1, ti2);
 
+	return 0;
+#endif
+
+#if 0
+	tt_log_set_level(TT_LOG_WARN);
+	for (int i = 1; i <= 4096; i *= 2)
+		gen_exp10(i*9);
 	return 0;
 #endif
 
