@@ -745,7 +745,7 @@ out:
  * - dividend >= divisor
  * - divisor is normalized
  * - qt: quotient, zeroed, size = max_quotient_words + 1
- * - rm: remainder, zeroed, size = max_remainder_words
+ * - rm: remainder, zeroed, size = max_remainder_words + 1
  * - msb_qt/msb_rm: quotient/remainder msb
  */
 int _tt_int_div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
@@ -780,7 +780,7 @@ int _tt_int_div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		} else {
 			_msb_qt = 1;
 			_msb_rm = msb_ds;
-			memcpy(rm, ds, msb_ds*4);
+			memcpy(rm, _dd, _msb_dd*4);
 		}
 
 		/* Calculate quotient MSB on first division */
@@ -802,7 +802,6 @@ int _tt_int_div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 	}
 
 	/* Last division */
-	tt_assert(msb_dd <= msb_ds*2);
 	memcpy(_dd, dd, (msb_dd-_msb_rm)*4);
 	memcpy(_dd+msb_dd-_msb_rm, rm, _msb_rm*4);
 	memset(_dd+msb_dd, 0, (msb_ds*2-msb_dd)*4);
@@ -897,19 +896,19 @@ int tt_int_div(struct tt_int *quo, struct tt_int *rem,
 	const int sign_quo = src1->_sign ^ src2->_sign;
 	const int sign_rem = src1->_sign;
 
-	/* Get shift bits to normalize divisor */
-	const int shift = __builtin_clz(src2->_int[src2->_msb-1]) - 1;
-
 	/* Working buffer for quotient, remainder */
 	uint *qt = NULL, *rm = NULL;
-	int msb_qt = src1->_msb - src2->_msb + 2;	/* one extra word */
-	int msb_rm = src2->_msb + 1;			/* " */
+	int msb_qt = src1->_msb - src2->_msb + 3;	/* One word + Shift */
+	int msb_rm = src2->_msb + 2;			/* " */
 
 	/* Working buffer for normalized dividend, divisor */
 	uint *ds = (uint *)src2->_int;
 	uint *dd = (uint *)src1->_int;
 	int msb_ds = src2->_msb;
 	int msb_dd = src1->_msb;
+
+	/* Get shift bits to normalize divisor */
+	const int shift = __builtin_clz(src2->_int[src2->_msb-1]) - 1;
 
 	/* Allocate working buffer */
 	uint *workbuf;
