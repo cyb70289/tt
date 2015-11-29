@@ -55,7 +55,7 @@ ECHO		:= echo
 CLEAN_FILES	:=
 
 # Compiler flags
-CPPFLAGS	+= -g -O2 -fno-strict-aliasing
+CPPFLAGS	+= -g -O3 -fno-strict-aliasing
 CPPFLAGS	+= -I$(TOPDIR)/include -I$(TOPDIR)/src
 CFLAGS		+= -Wall -Wstrict-prototypes -std=gnu99
 AFLAGS		+= -I$(TOPDIR)/include

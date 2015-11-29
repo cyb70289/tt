@@ -8,6 +8,8 @@
 
 #include <string.h>
 
+#pragma GCC diagnostic ignored "-Warray-bounds"
+
 #define NUM	1024
 
 static int keycmp(const struct tt_key *num, const void *v1, const void *v2)
