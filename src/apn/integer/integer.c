@@ -102,3 +102,33 @@ int _tt_int_sanity(const struct tt_int *ti)
 
 	return 0;
 }
+
+/* Shift integer
+ * - shift: + left, - right
+ * - return new msb
+ */
+int _tt_int_shift_buf(uint *_int, int msb, int shift)
+{
+	uint tmp = 0, tmp2;
+
+	if (shift > 0) {
+		for (int i = 0; i < msb; i++) {
+			tmp2 = _int[i];
+			_int[i] = ((_int[i] << shift) | tmp) & ~BIT(31);
+			tmp = tmp2 >> (31 - shift);
+		}
+		if (tmp)
+			_int[msb++] = tmp;
+	} else if (shift < 0) {
+		shift = -shift;
+		for (int i = msb-1; i >= 0; i--) {
+			tmp2 = _int[i];
+			_int[i] = (_int[i] >> shift) | tmp;
+			tmp = (tmp2 << (31 - shift)) & ~BIT(31);
+		}
+		if (_int[msb-1] == 0 && msb > 1)
+			msb--;
+	}
+
+	return msb;
+}

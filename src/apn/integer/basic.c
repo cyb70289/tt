@@ -962,16 +962,7 @@ int tt_int_div(struct tt_int *quo, struct tt_int *rem,
 		ret = _tt_int_realloc(rem, msb_rm);
 		if (ret)
 			goto out;
-		if (shift) {
-			uint tmp = 0, tmp2;
-			for (int i = msb_rm-1; i >= 0; i--) {
-				tmp2 = rm[i];
-				rm[i] = (rm[i] >> shift) | tmp;
-				tmp = (tmp2 << (31 - shift)) & ~BIT(31);
-			}
-			if (rm[msb_rm-1] == 0 && msb_rm > 1)
-				msb_rm--;
-		}
+		msb_rm = _tt_int_shift_buf(rm, msb_rm, -shift);
 		rem->_sign = sign_rem;
 		rem->_msb = msb_rm;
 		memcpy(rem->_int, rm, msb_rm * 4);

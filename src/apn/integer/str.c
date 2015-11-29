@@ -65,12 +65,17 @@ static uint div_dec9(const uint *dividend, uint *quo, int *len)
 /* Integer to decimal conversion
  * - 9 decimal digits are packed to one uint
  * - _int, msb: integer to be converted, must have one extra word
+ * - lshift: left shifted bits of _int
  * - dec buffer must be large enough
  */
-static int int_to_dec(uint *_int, int msb_int, uint *dec, int msb_dec)
+static int int_to_dec(uint *_int, int msb_int, int lshift,
+		uint *dec, int msb_dec)
 {
 	/* Adopt classic way on small input */
 	if (msb_int < dec9[DEC9_CROSS_IDX].msb * 2) {
+		/* Shift back */
+		msb_int = _tt_int_shift_buf(_int, msb_int, -lshift);
+
 		if (msb_int == 1 && _int[0] == 0)
 			return 0;
 
@@ -102,17 +107,7 @@ static int int_to_dec(uint *_int, int msb_int, uint *dec, int msb_dec)
 	}
 
 	/* Shift dividend to match normalized divisor */
-	const int dec9_shift = dec9[idx].shift;
-	if (dec9_shift) {
-		uint tmp = 0, tmp2;
-		for (int i = 0; i < msb_int; i++) {
-			tmp2 = _int[i];
-			_int[i] = ((_int[i] << dec9_shift) | tmp) & ~BIT(31);
-			tmp = tmp2 >> (31 - dec9_shift);
-		}
-		if (tmp)
-			_int[msb_int++] = tmp;
-	}
+	msb_int = _tt_int_shift_buf(_int, msb_int, dec9[idx].shift-lshift);
 
 	/* Allocate working buffer */
 	int msb_qt = msb_int - dec9[idx].msb + 2;	/* One extra word */
@@ -129,24 +124,12 @@ static int int_to_dec(uint *_int, int msb_int, uint *dec, int msb_dec)
 	if (ret)
 		goto out;
 
-	/* Shift remainder back */
-	if (dec9_shift) {
-		uint tmp = 0, tmp2;
-		for (int i = msb_rm-1; i >= 0; i--) {
-			tmp2 = rm[i];
-			rm[i] = (rm[i] >> dec9_shift) | tmp;
-			tmp = (tmp2 << (31 - dec9_shift)) & ~BIT(31);
-		}
-		if (rm[msb_rm-1] == 0 && msb_rm > 1)
-			msb_rm--;
-	}
-
 	/* Combine */
 	const int msb_dec9 = 1 << idx;
-	ret = int_to_dec(rm, msb_rm, dec, msb_dec9);
+	ret = int_to_dec(rm, msb_rm, dec9[idx].shift, dec, msb_dec9);
 	if (ret)
 		goto out;
-	ret = int_to_dec(qt, msb_qt, dec + msb_dec9, msb_dec - msb_dec9);
+	ret = int_to_dec(qt, msb_qt, 0, dec + msb_dec9, msb_dec - msb_dec9);
 
 out:
 	free(workbuf);
@@ -355,7 +338,7 @@ int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
 		uint *decbuf = intbuf + msb_int;
 
 		memcpy(intbuf, ti->_int, ti->_msb * 4);
-		int err = int_to_dec(intbuf, ti->_msb, decbuf, msb_dec);
+		int err = int_to_dec(intbuf, ti->_msb, 0, decbuf, msb_dec);
 		if (err) {
 			free(workbuf);
 			return err;
