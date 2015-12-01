@@ -1,1 +1,32 @@
-Numerical, arbitrary precision and symbolic mathematics.
+Arbitrary Precision Integer
+===========================
+
+- Basic operation: add, sub, mul, div, cmp
+- Conversion
+- Optimized algorithm:
+  * Karatsuba multiplication
+  * Divide and conquer division
+  * Fast base conversion
+- Math library:
+  * Factorial
+
+
+Arbitrary Precision Decimal
+===========================
+
+- Basic operation: add, sub, mul, div, cmp
+- Conversion
+
+
+Numerical Library
+=================
+
+- Matrix: gauss-jordan
+- FFT, DFT
+
+
+Common Library
+==============
+
+- Data structure: stack, queue, heap, bst
+- Algorithm: sort
