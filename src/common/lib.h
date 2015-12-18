@@ -62,3 +62,7 @@ int _tt_round(int odd, uint dig, int rnd);
 
 /* Bit reversal */
 uint _tt_bitrev(uint n, int bits);
+
+/* Pesudo random number */
+void _tt_srand(uint seed);
+uint _tt_rand(void);
