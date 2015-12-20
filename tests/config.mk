@@ -7,5 +7,6 @@ graph-objs		:= graph.o
 dft-objs		:= dft.o
 decimal-objs		:= decimal.o
 integer-objs		:= integer.o
+prime-objs		:= prime.o
 
-bin-y += matrix sort stack_queue heap tree graph dft decimal integer
+bin-y += matrix sort stack_queue heap tree graph dft decimal integer prime

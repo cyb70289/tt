@@ -106,9 +106,12 @@ int _tt_int_sanity(const struct tt_int *ti)
 /* Shift integer
  * - shift: + left, - right
  * - return new msb
+ * - shift should be in [-31, 31]
  */
 int _tt_int_shift_buf(uint *_int, int msb, int shift)
 {
+	tt_assert_fa(shift >= -31 && shift <= 31);
+
 	uint tmp = 0, tmp2;
 
 	if (shift > 0) {

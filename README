@@ -1,14 +1,16 @@
 Arbitrary Precision Integer
 ===========================
 
-- Basic operation: add, sub, mul, div, cmp
-- Conversion
-- Optimized algorithm:
+- Basic operation: add, sub, mul, div, cmp, conversion
+  * Classic algorithm
   * Karatsuba multiplication
   * Divide and conquer division
   * Fast base conversion
 - Math library:
   * Factorial
+  * Mersenne-Twisted random number generator
+- Number theory:
+  * Miller-Rabin primality checking
 
 
 Arbitrary Precision Decimal

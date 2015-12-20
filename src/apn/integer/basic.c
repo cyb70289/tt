@@ -153,7 +153,7 @@ static int add_sub_ints(struct tt_int *dst, const struct tt_int *src1,
  * - int1 must have enough space to hold result
  * - return result msb
  */
-static int add_buf(uint *int1, int msb1, const uint *int2, int msb2)
+int _tt_int_add_buf(uint *int1, int msb1, const uint *int2, int msb2)
 {
 	int i, carry = 0;
 
@@ -174,7 +174,7 @@ static int add_buf(uint *int1, int msb1, const uint *int2, int msb2)
  * - int1 >= int2
  * - return result msb
  */
-static int sub_buf(uint *int1, int msb1, const uint *int2, int msb2)
+int _tt_int_sub_buf(uint *int1, int msb1, const uint *int2, int msb2)
 {
 	int i, borrow = 0;
 
@@ -192,7 +192,7 @@ static int sub_buf(uint *int1, int msb1, const uint *int2, int msb2)
 }
 
 /* 1: src1 > src2, 0: src1 == src2, -1: src1 < src2 */
-static int cmp_buf(const uint *int1, int msb1, const uint *int2, int msb2)
+int _tt_int_cmp_buf(const uint *int1, int msb1, const uint *int2, int msb2)
 {
 	if (msb1 > msb2)
 		return 1;
@@ -253,7 +253,7 @@ static int get_uints(const uint *ui, int len)
 	return 0;
 }
 
-static int get_msb(const uint *ui, int len)
+int _tt_int_get_msb(const uint *ui, int len)
 {
 	while (len) {
 		if (ui[len-1])
@@ -290,13 +290,13 @@ static int mul_buf_classic(uint *intr, const uint *int1, const int msb1,
 		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++)
 			tmp128 += (uint64_t)int1[j] * int2[k];
 		int msbt = from128(tmp, tmp128);
-		msb = add_buf(intr+i, msb-i, tmp, msbt) + i;
+		msb = _tt_int_add_buf(intr+i, msb-i, tmp, msbt) + i;
 #else
 		uint tmp[3];
 		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++) {
 			uint64_t tmp64 = (uint64_t)int1[j] * int2[k];
 			int msbt = from64(tmp, tmp64);
-			msb = add_buf(intr+i, msb-i, tmp, msbt) + i;
+			msb = _tt_int_add_buf(intr+i, msb-i, tmp, msbt) + i;
 		}
 #endif
 	}
@@ -333,7 +333,7 @@ static int mul_buf_unbalanced(uint *intr, const uint *int1, int msb1,
 			memset(workbuf, 0, tmpsz * 4);
 			tmpmsb = mul_buf_kara(workbuf, int1, msb1,
 					int2, uints2, workbuf + tmpsz);
-			msbr = add_buf(intr, msbr, workbuf, tmpmsb) - msb1;
+			msbr = _tt_int_add_buf(intr, msbr, workbuf, tmpmsb) - msb1;
 			if (msbr < 0)
 				msbr = 0;
 		} else {
@@ -348,7 +348,7 @@ static int mul_buf_unbalanced(uint *intr, const uint *int1, int msb1,
 	tt_assert_fa(left);
 	memset(workbuf, 0, tmpsz * 4);
 	tmpmsb = mul_buf_kara(workbuf, int1, msb1, int2, left, workbuf + tmpsz);
-	msbr = add_buf(intr, msbr, workbuf, tmpmsb);
+	msbr = _tt_int_add_buf(intr, msbr, workbuf, tmpmsb);
 
 	return msb + msbr;
 }
@@ -415,26 +415,26 @@ static int mul_buf_kara(uint *intr, const uint *int1, int msb1,
 		int msb_a_b = msb_a;
 		memcpy(a_b, int1+div, msb_a*4);
 		if (msb_b)
-			msb_a_b = add_buf(a_b, msb_a_b, int1, msb_b);
+			msb_a_b = _tt_int_add_buf(a_b, msb_a_b, int1, msb_b);
 
 		/* C+D */
 		int msb_c_d = msb_c;
 		memcpy(c_d, int2+div, msb_c*4);
 		if (msb_d)
-			msb_c_d = add_buf(c_d, msb_c_d, int2, msb_d);
+			msb_c_d = _tt_int_add_buf(c_d, msb_c_d, int2, msb_d);
 
 		/* A*D+B*C = (A+B)*(C+D)-A*C-B*D */
 		int msb_ad_bc = mul_buf_kara(ad_bc, a_b, msb_a_b, c_d, msb_c_d,
 				nextbuf);
-		msb_ad_bc = sub_buf(ad_bc, msb_ad_bc, intr+div*2, msb_ac);
+		msb_ad_bc = _tt_int_sub_buf(ad_bc, msb_ad_bc, intr+div*2, msb_ac);
 		if (msb_bd)
-			msb_ad_bc = sub_buf(ad_bc, msb_ad_bc, intr, msb_bd);
+			msb_ad_bc = _tt_int_sub_buf(ad_bc, msb_ad_bc, intr, msb_bd);
 
 		/* Sum all */
 		int msb2 = msb - div;
 		if (msb2 <= 0)
 			msb2 = 1;
-		msb = add_buf(intr+div, msb2, ad_bc, msb_ad_bc) + div;
+		msb = _tt_int_add_buf(intr+div, msb2, ad_bc, msb_ad_bc) + div;
 	}
 
 	tt_assert_fa(msb == (msb1+msb2) || msb == (msb1+msb2-1));
@@ -477,7 +477,7 @@ int _tt_int_mul_buf(uint *intr, const uint *int1, int msb1,
 static uint guess_quotient(const uint *_src1, int msb1,
 		const uint *_src2, int msb2)
 {
-	if (cmp_buf(_src1, msb1, _src2, msb2) < 0)
+	if (_tt_int_cmp_buf(_src1, msb1, _src2, msb2) < 0)
 		return 0;
 	else if (msb1 == msb2)
 		return 1;
@@ -508,7 +508,7 @@ static uint guess_quotient(const uint *_src1, int msb1,
 	}
 
 	uint q = (uint)(dividend / divisor);
-	tt_assert_fa(q < BIT(31));
+	tt_assert_fa(q <= BIT(31));
 	return q;
 }
 
@@ -530,10 +530,10 @@ static int div_buf_classic(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 	uint *dd_top = _dd + msb_dd - msb_ds;
 
 	*msb_qt = msb_dd - msb_ds;
-	if (cmp_buf(dd_top, msb_ds, ds, msb_ds) >= 0) {
+	if (_tt_int_cmp_buf(dd_top, msb_ds, ds, msb_ds) >= 0) {
 		/* First digit */
 		qt[(*msb_qt)++] = 1;
-		topmsb = sub_buf(dd_top, msb_ds, ds, msb_ds);
+		topmsb = _tt_int_sub_buf(dd_top, msb_ds, ds, msb_ds);
 	}
 	if (*msb_qt == 0)
 		*msb_qt = 1;
@@ -548,12 +548,12 @@ static int div_buf_classic(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 			memset(tmpmul, 0, sz_tmpmul * 4);
 			int mulmsb = mul_buf_classic(tmpmul, ds, msb_ds, &q, 1);
 
-			while (cmp_buf(tmpmul, mulmsb, dd_top, topmsb) > 0) {
-				mulmsb = sub_buf(tmpmul, mulmsb, ds, msb_ds);
+			while (_tt_int_cmp_buf(tmpmul, mulmsb, dd_top, topmsb) > 0) {
+				mulmsb = _tt_int_sub_buf(tmpmul, mulmsb, ds, msb_ds);
 				q--;
 			}
 			tt_assert_fa(topmsb >= mulmsb);
-			topmsb = sub_buf(dd_top, topmsb, tmpmul, mulmsb);
+			topmsb = _tt_int_sub_buf(dd_top, topmsb, tmpmul, mulmsb);
 		}
 		qt[qt_idx] = q;
 		qt_idx--;
@@ -648,28 +648,28 @@ static int div_buf_bin(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 	 *                |<- h ->|
 	 */
 	memcpy(nextdd, dd, h*2*4);
-	int msb_nextdd = get_msb(nextdd, msb_rmh + h*2);
+	int msb_nextdd = _tt_int_get_msb(nextdd, msb_rmh + h*2);
 	int msb_qt_ds = _tt_int_mul_buf(qt_ds+h, qth, msb_qth,
-			ds, get_msb(ds, h)) + h;
-	msb_qt_ds = get_msb(qt_ds, msb_qt_ds);
+			ds, _tt_int_get_msb(ds, h)) + h;
+	msb_qt_ds = _tt_int_get_msb(qt_ds, msb_qt_ds);
 
-	while (cmp_buf(nextdd, msb_nextdd, qt_ds, msb_qt_ds) < 0) {
+	while (_tt_int_cmp_buf(nextdd, msb_nextdd, qt_ds, msb_qt_ds) < 0) {
 		const uint one = 1;
-		msb_qth = sub_buf(qth, msb_qth, &one, 1);
+		msb_qth = _tt_int_sub_buf(qth, msb_qth, &one, 1);
 		if (msb_qt_ds > h &&
-				cmp_buf(qt_ds+h, msb_qt_ds-h, ds, msb_ds) > 0) {
+				_tt_int_cmp_buf(qt_ds+h, msb_qt_ds-h, ds, msb_ds) > 0) {
 			/* Decrease subtrahend */
-			msb_qt_ds = sub_buf(qt_ds+h, msb_qt_ds-h, ds, msb_ds) + h;
+			msb_qt_ds = _tt_int_sub_buf(qt_ds+h, msb_qt_ds-h, ds, msb_ds) + h;
 		} else {
 			/* Increase minuend */
 			int msb_tmp = msb_nextdd - h;
 			if (msb_tmp <= 0)
 				msb_tmp = 1;
-			msb_nextdd = add_buf(nextdd+h, msb_tmp, ds, msb_ds) + h;
+			msb_nextdd = _tt_int_add_buf(nextdd+h, msb_tmp, ds, msb_ds) + h;
 			break;
 		}
 	}
-	msb_nextdd = sub_buf(nextdd, msb_nextdd, qt_ds, msb_qt_ds);
+	msb_nextdd = _tt_int_sub_buf(nextdd, msb_nextdd, qt_ds, msb_qt_ds);
 
 	/* Clear used buffer */
 	memset(qt_ds+h, 0, (msb_dd-msb_ds+2)*4);
@@ -690,7 +690,7 @@ static int div_buf_bin(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 	uint *rml = rm + h;
 
 	if (msb_nextdd > h &&
-			cmp_buf(nextdd+h, msb_nextdd-h, ds+h, msb_ds-h) >= 0) {
+			_tt_int_cmp_buf(nextdd+h, msb_nextdd-h, ds+h, msb_ds-h) >= 0) {
 		ret = div_buf_bin(qtl, &msb_qtl, rml, &msb_rml,
 				nextdd+h, msb_nextdd-h, ds+h, msb_ds-h);
 		if (ret)
@@ -717,24 +717,24 @@ static int div_buf_bin(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 	 *   +---------+
 	 */
 	memcpy(rm, nextdd, h*4);
-	msb_rml = get_msb(rm, msb_rml+h);
-	msb_qt_ds = _tt_int_mul_buf(qt_ds, qtl, msb_qtl, ds, get_msb(ds, h));
+	msb_rml = _tt_int_get_msb(rm, msb_rml+h);
+	msb_qt_ds = _tt_int_mul_buf(qt_ds, qtl, msb_qtl, ds, _tt_int_get_msb(ds, h));
 
-	while (cmp_buf(rm, msb_rml, qt_ds, msb_qt_ds) < 0) {
+	while (_tt_int_cmp_buf(rm, msb_rml, qt_ds, msb_qt_ds) < 0) {
 		const uint one = 1;
-		msb_qtl = sub_buf(qtl, msb_qtl, &one, 1);
-		if (cmp_buf(qt_ds, msb_qt_ds, ds, msb_ds) > 0) {
+		msb_qtl = _tt_int_sub_buf(qtl, msb_qtl, &one, 1);
+		if (_tt_int_cmp_buf(qt_ds, msb_qt_ds, ds, msb_ds) > 0) {
 			/* Decrease subtrahend */
-			msb_qt_ds = sub_buf(qt_ds, msb_qt_ds, ds, msb_ds);
+			msb_qt_ds = _tt_int_sub_buf(qt_ds, msb_qt_ds, ds, msb_ds);
 		} else {
 			/* Increase minuend */
-			msb_rml = add_buf(rm, msb_rml, ds, msb_ds);
+			msb_rml = _tt_int_add_buf(rm, msb_rml, ds, msb_ds);
 			break;
 		}
 	}
-	*msb_rm = sub_buf(rm, msb_rml, qt_ds, msb_qt_ds);
+	*msb_rm = _tt_int_sub_buf(rm, msb_rml, qt_ds, msb_qt_ds);
 
-	*msb_qt = add_buf(qt, msb_qth+h, qtl, msb_qtl);
+	*msb_qt = _tt_int_add_buf(qt, msb_qth+h, qtl, msb_qtl);
 
 out:
 	free(workbuf);
@@ -771,8 +771,8 @@ int _tt_int_div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 
 	while (1) {
 		/* Partial division */
-		int _msb_dd = get_msb(_dd, msb_ds*2);
-		if (cmp_buf(_dd, _msb_dd, ds, msb_ds) >= 0) {
+		int _msb_dd = _tt_int_get_msb(_dd, msb_ds*2);
+		if (_tt_int_cmp_buf(_dd, _msb_dd, ds, msb_ds) >= 0) {
 			ret = div_buf_bin(qt+offset, &_msb_qt, rm, &_msb_rm,
 					_dd, _msb_dd, ds, msb_ds);
 			if (ret)
@@ -805,8 +805,8 @@ int _tt_int_div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 	memcpy(_dd, dd, (msb_dd-_msb_rm)*4);
 	memcpy(_dd+msb_dd-_msb_rm, rm, _msb_rm*4);
 	memset(_dd+msb_dd, 0, (msb_ds*2-msb_dd)*4);
-	msb_dd = get_msb(_dd, msb_dd);
-	if (cmp_buf(_dd, msb_dd, ds, msb_ds) >= 0) {
+	msb_dd = _tt_int_get_msb(_dd, msb_dd);
+	if (_tt_int_cmp_buf(_dd, msb_dd, ds, msb_ds) >= 0) {
 		memset(rm, 0, msb_ds*4);
 		ret = div_buf_bin(qt, &_msb_qt, rm, msb_rm,
 				_dd, msb_dd, ds, msb_ds);
@@ -978,7 +978,7 @@ out:
  */
 int tt_int_cmp_abs(const struct tt_int *src1, const struct tt_int *src2)
 {
-	return cmp_buf(src1->_int, src1->_msb, src2->_int, src2->_msb);
+	return _tt_int_cmp_buf(src1->_int, src1->_msb, src2->_int, src2->_msb);
 }
 
 int tt_int_cmp(const struct tt_int *src1, const struct tt_int *src2)
