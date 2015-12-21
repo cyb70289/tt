@@ -5,8 +5,10 @@
 #include <tt/tt.h>
 #include <tt/apn/integer.h>
 #include <apn/integer/integer.h>
+#include <common/lib.h>
 
 #include <string.h>
+#include <math.h>
 
 void test_prime(const char *s)
 {
@@ -79,6 +81,35 @@ void test_mersenne(void)
 	printf("2^%d - 1\n", N);
 }
 
+void prime_distribute(void)
+{
+	#define NN	8
+
+	uint r[NN];
+	struct tt_int ti = {
+		._sign = 0,
+		.__sz = NN,
+		._max = NN,
+		._int = r,
+	};
+
+	/* In theory, there should be 100 primes in pcnt100 tries  */
+	uint pcnt100 = (uint)(log(2.0) * 31.0 * NN * 100.0);
+	uint pcnt = 0;
+
+	for (int i = 0; i < pcnt100; i++) {
+		/* Generate random integer with 1 ~ N words */
+		for (int j = 0; j < NN; j++)
+			r[j] = _tt_rand() & ~BIT(31);
+		ti._msb = _tt_int_get_msb(r, NN);
+
+		if (tt_int_isprime(&ti))
+			pcnt++;
+	}
+
+	printf("%d primes found\n", pcnt);
+}
+
 int main(void)
 {
 	tt_log_set_level(TT_LOG_WARN);
@@ -86,7 +117,7 @@ int main(void)
 	test_prime("31252509122307099513722565100727743481642064519811184448629"
 		   "54305561681091773335180100000000000000000537");
 	test_mersenne();
-	nth_prime(1000000);
+	prime_distribute();
 
 	return 0;
 }
