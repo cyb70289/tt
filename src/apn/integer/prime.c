@@ -9,8 +9,6 @@
 
 #include "string.h"
 
-#define MILLER_RABIN_RND	40
-
 /* Naive algorithm (p < 2^31) */
 static bool isprime_naive(uint p)
 {
@@ -163,7 +161,7 @@ static int pick_rand(const uint *n, int msbn, uint *r)
 	return msbr;
 }
 
-static bool isprime_miller_rabin(const uint *n, int msbn)
+static bool isprime_miller_rabin(const uint *n, int msbn, int rounds)
 {
 	const int shift = __builtin_clz(n[msbn-1]) - 1;
 
@@ -206,7 +204,7 @@ static bool isprime_miller_rabin(const uint *n, int msbn)
 	k += rsh;
 
 	bool ret = true;
-	for (int i = 0; i < MILLER_RABIN_RND; i++) {
+	while (rounds--) {
 		int msbr = pick_rand(n, msbn, r);
 		if (!isprime_miller_rabin_1(n, msbn, norm, msbnorm, shift,
 					r, msbr, m, msbm, k, t)) {
@@ -219,11 +217,17 @@ static bool isprime_miller_rabin(const uint *n, int msbn)
 	return ret;
 }
 
+bool _tt_int_isprime(const uint *ui, int msb, int rounds)
+{
+	if (msb == 1)
+		return isprime_naive(ui[0]);
+	if ((ui[0] & 0x1) == 0)
+		return false;
+	return isprime_miller_rabin(ui, msb, rounds);
+}
+
 bool tt_int_isprime(const struct tt_int *ti)
 {
-	if (ti->_msb == 1)
-		return isprime_naive(ti->_int[0]);
-	if ((ti->_int[0] & 0x1) == 0)
-		return false;
-	return isprime_miller_rabin(ti->_int, ti->_msb);
+	/* 27 test rounds reaches 1/2^80 error bound */
+	return _tt_int_isprime(ti->_int, ti->_msb, 27);
 }

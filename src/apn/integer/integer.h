@@ -46,3 +46,5 @@ int _tt_int_div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 int _tt_int_shift_buf(uint *_int, int msb, int shift);
 int _tt_int_cmp_buf(const uint *int1, int msb1, const uint *int2, int msb2);
 int _tt_int_get_msb(const uint *ui, int len);
+
+bool _tt_int_isprime(const uint *ui, int msb, int rounds);
