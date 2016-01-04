@@ -1,4 +1,4 @@
-/* Primality testing
+/* Number: gcd, prime
  *
  * Copyright (C) 2015 Yibo Cai
  */
@@ -110,14 +110,37 @@ void prime_distribute(void)
 	printf("%d primes found\n", pcnt);
 }
 
+void test_gcd(void)
+{
+	const char *a = "57715475943958356502146146744435122067445196";
+	const char *b = "171466873366445888634645110566534137709077062";
+
+	struct tt_int *ti1 = tt_int_alloc();
+	struct tt_int *ti2 = tt_int_alloc();
+	struct tt_int *ti3 = tt_int_alloc();
+
+	tt_int_from_string(ti1, a);
+	tt_int_from_string(ti2, b);
+
+	tt_int_gcd(ti3, ti1, ti2);
+
+	char *g = NULL;
+	tt_int_to_string(ti3, &g, 10);
+	printf("%s\n", g);
+}
+
 int main(void)
 {
 	tt_log_set_level(TT_LOG_WARN);
 
+	test_gcd();
+
+#if 0
 	test_prime("31252509122307099513722565100727743481642064519811184448629"
 		   "54305561681091773335180100000000000000000537");
 	test_mersenne();
 	prime_distribute();
+#endif
 
 	return 0;
 }

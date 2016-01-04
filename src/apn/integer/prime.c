@@ -217,7 +217,7 @@ static bool isprime_miller_rabin(const uint *n, int msbn, int rounds)
 	return ret;
 }
 
-bool _tt_int_isprime(const uint *ui, int msb, int rounds)
+bool _tt_int_isprime_buf(const uint *ui, int msb, int rounds)
 {
 	if (msb == 1)
 		return isprime_naive(ui[0]);
@@ -229,5 +229,5 @@ bool _tt_int_isprime(const uint *ui, int msb, int rounds)
 bool tt_int_isprime(const struct tt_int *ti)
 {
 	/* 27 test rounds reaches 1/2^80 error bound */
-	return _tt_int_isprime(ti->_int, ti->_msb, 27);
+	return _tt_int_isprime_buf(ti->_int, ti->_msb, 27);
 }

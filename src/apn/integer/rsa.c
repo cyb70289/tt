@@ -189,7 +189,7 @@ static int prime_1(int bits, uint *p, int msb)
 		if (i < ARRAY_SIZE(_primes))	/* Is composite */
 			continue;
 
-		if (!_tt_int_isprime(ti._int, ti._msb, rounds))
+		if (!_tt_int_isprime_buf(ti._int, ti._msb, rounds))
 			continue;
 
 		ret = tt_int_div(NULL, rem, &ti, &e);

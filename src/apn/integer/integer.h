@@ -9,9 +9,9 @@ struct tt_int {
 
 #define TT_INT_DEF	19	/* 2^(19*31)-1 --> 177 decimal digits */
 #define TT_INT_GUARD	1	/* Guard ints at top of _int[] */
-	const uint __sz;	/* Size of _int[] buffer in ints */
-	const uint _max;	/* Maximum integers in _int[], 1 ~ __sz-1 */
-	uint _msb;		/* Valid integers in _int[], 1 ~ _max */
+	const int __sz;		/* Size of _int[] buffer in ints */
+	const int _max;		/* Maximum integers in _int[], 1 ~ __sz-1 */
+	int _msb;		/* Valid integers in _int[], 1 ~ _max */
 
 	uint *_int;		/* Integer array
 				 * Bit -> 31 30                     0
@@ -47,4 +47,6 @@ int _tt_int_shift_buf(uint *_int, int msb, int shift);
 int _tt_int_cmp_buf(const uint *int1, int msb1, const uint *int2, int msb2);
 int _tt_int_get_msb(const uint *ui, int len);
 
-bool _tt_int_isprime(const uint *ui, int msb, int rounds);
+int _tt_int_gcd_buf(uint *g, int *msb,
+		const uint *a, int msba, const uint *b, int msbb);
+bool _tt_int_isprime_buf(const uint *ui, int msb, int rounds);
