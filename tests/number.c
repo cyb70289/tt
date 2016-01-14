@@ -68,7 +68,6 @@ void test_mersenne(void)
 		sz--;
 	struct tt_int ti = {
 		._sign = 0,
-		.__sz = sz,
 		._max = sz,
 		._msb = sz,
 		._int = m,
@@ -88,7 +87,6 @@ void prime_distribute(void)
 	uint r[NN];
 	struct tt_int ti = {
 		._sign = 0,
-		.__sz = NN,
 		._max = NN,
 		._int = r,
 	};

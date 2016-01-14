@@ -8,9 +8,7 @@ struct tt_int {
 	int _sign;		/* Sign: 0/+, 1/- */
 
 #define TT_INT_DEF	19	/* 2^(19*31)-1 --> 177 decimal digits */
-#define TT_INT_GUARD	1	/* Guard ints at top of _int[] */
-	const int __sz;		/* Size of _int[] buffer in ints */
-	const int _max;		/* Maximum integers in _int[], 1 ~ __sz-1 */
+	const int _max;		/* Size of _int[] buffer in ints */
 	int _msb;		/* Valid integers in _int[], 1 ~ _max */
 
 	uint *_int;		/* Integer array
@@ -19,7 +17,6 @@ struct tt_int {
 				 * Val -> |0| Integer: 0 ~ 2^31 - 1 |
 				 *        +-+-----------------------+
 				 * - Each uint contains 31 bits
-				 * - Top uint is reserved, cannot use
 				 */
 };
 

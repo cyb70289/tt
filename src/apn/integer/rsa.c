@@ -151,16 +151,13 @@ static int prime_1(int bits, uint *p, int msb)
 	bits %= 31;
 
 	struct tt_int ti = {
-		._sign = 0, .__sz = msb, ._max = msb, ._msb = msb,
-		._int = p,
+		._sign = 0, ._max = msb, ._msb = msb, ._int = p,
 	};
 	struct tt_int e = {
-		._sign = 0, .__sz = 1, ._max = 1, ._msb = 1,
-		._int = (uint *)&_e,
+		._sign = 0, ._max = 1, ._msb = 1, ._int = (uint *)&_e,
 	};
 	struct tt_int pi = {
-		._sign = 0, .__sz = 1, ._max = 1, ._msb = 1,
-		._int = &pp,
+		._sign = 0, ._max = 1, ._msb = 1, ._int = &pp,
 	};
 
 	struct tt_int *rem = tt_int_alloc();
