@@ -10,7 +10,8 @@ Arbitrary Precision Integer
   * Factorial
   * Mersenne-Twisted random number generator
 - Number theory:
-  * Miller-Rabin primality checking
+  * GCD, Extened GCD
+  * Miller-Rabin primality testing
 
 
 Arbitrary Precision Decimal

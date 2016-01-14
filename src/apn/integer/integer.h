@@ -23,6 +23,7 @@ struct tt_int {
 int _tt_int_realloc(struct tt_int *ti, uint msb);
 
 int _tt_int_copy(struct tt_int *dst, const struct tt_int *src);
+void _tt_int_swap(struct tt_int *ti1, struct tt_int *ti2);
 
 /* Clear zero */
 void _tt_int_zero(struct tt_int *ti);
@@ -44,6 +45,4 @@ int _tt_int_shift_buf(uint *_int, int msb, int shift);
 int _tt_int_cmp_buf(const uint *int1, int msb1, const uint *int2, int msb2);
 int _tt_int_get_msb(const uint *ui, int len);
 
-int _tt_int_gcd_buf(uint *g, int *msb,
-		const uint *a, int msba, const uint *b, int msbb);
 bool _tt_int_isprime_buf(const uint *ui, int msb, int rounds);

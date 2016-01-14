@@ -68,6 +68,13 @@ int _tt_int_copy(struct tt_int *dst, const struct tt_int *src)
 	return 0;
 }
 
+void _tt_int_swap(struct tt_int *ti1, struct tt_int *ti2)
+{
+	struct tt_int ti = *ti1;
+	memcpy(ti1, ti2, sizeof(struct tt_int));
+	memcpy(ti2, &ti, sizeof(struct tt_int));
+}
+
 void _tt_int_zero(struct tt_int *ti)
 {
 	ti->_sign = 0;
@@ -102,33 +109,73 @@ int _tt_int_sanity(const struct tt_int *ti)
 
 /* Shift integer
  * - shift: + left, - right
+ * - _int buffer must be large enough
  * - return new msb
- * - shift should be in [-31, 31]
+ * - fill empty space with zero
  */
 int _tt_int_shift_buf(uint *_int, int msb, int shift)
 {
-	tt_assert_fa(shift >= -31 && shift <= 31);
-
+	int sh_uints, sh_bits;
 	uint tmp = 0, tmp2;
 
 	if (shift > 0) {
-		for (int i = 0; i < msb; i++) {
-			tmp2 = _int[i];
-			_int[i] = ((_int[i] << shift) | tmp) & ~BIT(31);
-			tmp = tmp2 >> (31 - shift);
+		sh_uints = shift / 31;
+		sh_bits = shift % 31;
+
+		if (sh_uints) {
+			memmove(_int+sh_uints, _int, msb*4);
+			memset(_int, 0, sh_uints*4);
+			msb += sh_uints;
 		}
-		if (tmp)
-			_int[msb++] = tmp;
+
+		if (sh_bits) {
+			for (int i = sh_uints; i < msb; i++) {
+				tmp2 = _int[i];
+				_int[i] = ((_int[i] << sh_bits) | tmp) & ~BIT(31);
+				tmp = tmp2 >> (31 - sh_bits);
+			}
+			if (tmp)
+				_int[msb++] = tmp;
+		}
 	} else if (shift < 0) {
 		shift = -shift;
-		for (int i = msb-1; i >= 0; i--) {
-			tmp2 = _int[i];
-			_int[i] = (_int[i] >> shift) | tmp;
-			tmp = (tmp2 << (31 - shift)) & ~BIT(31);
+		sh_uints = shift / 31;
+		sh_bits = shift % 31;
+
+		if (sh_uints >= msb) {
+			memset(_int, 0, msb*4);
+			return 1;
 		}
-		if (_int[msb-1] == 0 && msb > 1)
-			msb--;
+
+		if (sh_uints) {
+			memmove(_int, _int+sh_uints, (msb-sh_uints)*4);
+			memset(_int+msb-sh_uints, 0, sh_uints*4);
+			msb -= sh_uints;
+		}
+
+		if (sh_bits) {
+			for (int i = msb-1; i >= 0; i--) {
+				tmp2 = _int[i];
+				_int[i] = (_int[i] >> sh_bits) | tmp;
+				tmp = (tmp2 << (31 - sh_bits)) & ~BIT(31);
+			}
+			if (_int[msb-1] == 0 && msb > 1)
+				msb--;
+		}
 	}
 
 	return msb;
+}
+
+/* Shift integer: shift: + left, - right */
+int tt_int_shift(struct tt_int *ti, int shift)
+{
+	if (shift > 0) {
+		int ret = _tt_int_realloc(ti, ti->_msb + (shift+30)/31);
+		if (ret)
+			return ret;
+	}
+
+	ti->_msb = _tt_int_shift_buf(ti->_int, ti->_msb, shift);
+	return 0;
 }

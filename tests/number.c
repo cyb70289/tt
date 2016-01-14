@@ -110,21 +110,35 @@ void prime_distribute(void)
 
 void test_gcd(void)
 {
-	const char *a = "57715475943958356502146146744435122067445196";
-	const char *b = "171466873366445888634645110566534137709077062";
+	const char *a = "9903824712476097189547457927456428897123434496";
+	const char *b = "7417779112426492492240709295800320";
 
-	struct tt_int *ti1 = tt_int_alloc();
-	struct tt_int *ti2 = tt_int_alloc();
-	struct tt_int *ti3 = tt_int_alloc();
+	struct tt_int *tia = tt_int_alloc();
+	struct tt_int *tib = tt_int_alloc();
+	struct tt_int *tig = tt_int_alloc();
+	struct tt_int *tiu = tt_int_alloc();
+	struct tt_int *tiv = tt_int_alloc();
 
-	tt_int_from_string(ti1, a);
-	tt_int_from_string(ti2, b);
+	tt_int_from_string(tia, a);
+	tt_int_from_string(tib, b);
 
-	tt_int_gcd(ti3, ti1, ti2);
+	tt_int_extgcd(tig, tiu, tiv, tia, tib);
 
-	char *g = NULL;
-	tt_int_to_string(ti3, &g, 10);
-	printf("%s\n", g);
+	char *g = NULL, *u = NULL, *v = NULL;
+	tt_int_to_string(tig, &g, 10);
+	tt_int_to_string(tiu, &u, 10);
+	tt_int_to_string(tiv, &v, 10);
+	printf("%s = ", g);
+	printf("%s * %s %s %s * %s\n", u, a, tiv->_sign?"\b":"+", v, b);
+
+	free(g);
+	free(u);
+	free(v);
+	tt_int_free(tia);
+	tt_int_free(tib);
+	tt_int_free(tig);
+	tt_int_free(tiu);
+	tt_int_free(tiv);
 }
 
 int main(void)
@@ -133,12 +147,10 @@ int main(void)
 
 	test_gcd();
 
-#if 0
 	test_prime("31252509122307099513722565100727743481642064519811184448629"
 		   "54305561681091773335180100000000000000000537");
 	test_mersenne();
 	prime_distribute();
-#endif
 
 	return 0;
 }
