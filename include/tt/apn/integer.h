@@ -37,4 +37,6 @@ int tt_int_factorial(struct tt_int *ti, const int n);
 int tt_int_gcd(struct tt_int *g, const struct tt_int *a, const struct tt_int *b);
 int tt_int_extgcd(struct tt_int *g, struct tt_int *u, struct tt_int *v,
 		const struct tt_int *a, const struct tt_int *b);
+int tt_int_mod_inv(struct tt_int *m,
+		const struct tt_int *a, const struct tt_int *b);
 bool tt_int_isprime(const struct tt_int *ti);

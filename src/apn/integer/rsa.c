@@ -150,15 +150,9 @@ static int prime_1(int bits, uint *p, int msb)
 	rounds = bits_to_rounds(bits);
 	bits %= 31;
 
-	struct tt_int ti = {
-		._sign = 0, ._max = msb, ._msb = msb, ._int = p,
-	};
-	struct tt_int e = {
-		._sign = 0, ._max = 1, ._msb = 1, ._int = (uint *)&_e,
-	};
-	struct tt_int pi = {
-		._sign = 0, ._max = 1, ._msb = 1, ._int = &pp,
-	};
+	struct tt_int ti = _TT_INT_DECL(msb, p);
+	struct tt_int e = _TT_INT_DECL(1, &_e);
+	struct tt_int pi = _TT_INT_DECL(1, &pp);
 
 	struct tt_int *rem = tt_int_alloc();
 

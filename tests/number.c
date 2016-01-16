@@ -66,12 +66,7 @@ void test_mersenne(void)
 	m[sz-1] = (1 << (n - 31*(sz-1) - 1)) - 1;
 	if (m[sz-1] == 0)
 		sz--;
-	struct tt_int ti = {
-		._sign = 0,
-		._max = sz,
-		._msb = sz,
-		._int = m,
-	};
+	struct tt_int ti = _TT_INT_DECL(sz, m);
 
 	if (tt_int_isprime(&ti))
 		printf("Prime: ");
@@ -141,11 +136,36 @@ void test_gcd(void)
 	tt_int_free(tiv);
 }
 
+void test_mod(void)
+{
+	const char *a = "1111111111111111111111111111111111111";
+	const char *b = "1267650600228229401496703205376";
+
+	struct tt_int *tia = tt_int_alloc();
+	struct tt_int *tib = tt_int_alloc();
+	struct tt_int *tim = tt_int_alloc();
+
+	tt_int_from_string(tia, a);
+	tt_int_from_string(tib, b);
+
+	tt_int_mod_inv(tim, tia, tib);
+
+	char *m = NULL;
+	tt_int_to_string(tim, &m, 10);
+	printf("modinv = %s\n", m);
+
+	free(m);
+	tt_int_free(tia);
+	tt_int_free(tib);
+	tt_int_free(tim);
+}
+
 int main(void)
 {
 	tt_log_set_level(TT_LOG_WARN);
 
 	test_gcd();
+	test_mod();
 
 	test_prime("31252509122307099513722565100727743481642064519811184448629"
 		   "54305561681091773335180100000000000000000537");

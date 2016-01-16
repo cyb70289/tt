@@ -20,12 +20,12 @@ struct tt_int {
 				 */
 };
 
-int _tt_int_realloc(struct tt_int *ti, uint msb);
+#define _TT_INT_DECL(msb, i)	{ 0, msb, msb, (uint *)i }
 
+int _tt_int_realloc(struct tt_int *ti, uint msb);
 int _tt_int_copy(struct tt_int *dst, const struct tt_int *src);
 void _tt_int_swap(struct tt_int *ti1, struct tt_int *ti2);
 
-/* Clear zero */
 void _tt_int_zero(struct tt_int *ti);
 
 static inline bool _tt_int_is_zero(const struct tt_int *ti)
