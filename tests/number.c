@@ -77,6 +77,8 @@ void test_mersenne(void)
 
 void prime_distribute(void)
 {
+	printf("Testing prime distribution...\n");
+
 	#define NN	8
 
 	uint r[NN];
@@ -103,8 +105,61 @@ void prime_distribute(void)
 	printf("%d primes found\n", pcnt);
 }
 
+/* Random integer with size = msb */
+struct tt_int *rand_int(int msb)
+{
+	struct tt_int *ti = tt_int_alloc();
+	if (_tt_int_realloc(ti, msb))
+		return NULL;
+
+	ti->_msb = msb;
+	for (int i = 0; i < msb-1; i++)
+		ti->_int[i] = _tt_rand() & ~(1<<31);
+	do {
+		ti->_int[msb-1] = _tt_rand() & ~(1<<31);
+	} while (ti->_int[msb-1] == 0);
+
+	return ti;
+}
+
 void test_gcd(void)
 {
+#if 1
+	printf("Testing GCD...\n");
+
+	struct tt_int *u = tt_int_alloc();
+	struct tt_int *v = tt_int_alloc();
+	struct tt_int *g = tt_int_alloc();
+
+#define GCD_MAX_MSB	100
+#define GCD_COUNT	1000
+	for (int i = 0; i < GCD_COUNT; i++) {
+		struct tt_int *a = rand_int(_tt_rand() % GCD_MAX_MSB + 1);
+		struct tt_int *b = rand_int(_tt_rand() % GCD_MAX_MSB + 1);
+
+		tt_int_extgcd(g, u, v, a, b);
+
+		tt_int_mul(u, a, u);
+		tt_int_mul(v, b, v);
+		tt_int_add(u, u, v);
+
+		if (tt_int_cmp(g, u)) {
+			tt_error("GCD test failed!");
+			_tt_int_print(a);
+			_tt_int_print(b);
+			break;
+		}
+
+		tt_int_free(a);
+		tt_int_free(b);
+	}
+
+	tt_int_free(u);
+	tt_int_free(v);
+	tt_int_free(g);
+
+	printf("Done\n");
+#else
 	const char *a = "9903824712476097189547457927456428897123434496";
 	const char *b = "7417779112426492492240709295800320";
 
@@ -134,30 +189,7 @@ void test_gcd(void)
 	tt_int_free(tig);
 	tt_int_free(tiu);
 	tt_int_free(tiv);
-}
-
-void test_mod(void)
-{
-	const char *a = "1111111111111111111111111111111111111";
-	const char *b = "1267650600228229401496703205376";
-
-	struct tt_int *tia = tt_int_alloc();
-	struct tt_int *tib = tt_int_alloc();
-	struct tt_int *tim = tt_int_alloc();
-
-	tt_int_from_string(tia, a);
-	tt_int_from_string(tib, b);
-
-	tt_int_mod_inv(tim, tia, tib);
-
-	char *m = NULL;
-	tt_int_to_string(tim, &m, 10);
-	printf("modinv = %s\n", m);
-
-	free(m);
-	tt_int_free(tia);
-	tt_int_free(tib);
-	tt_int_free(tim);
+#endif
 }
 
 int main(void)
@@ -165,11 +197,11 @@ int main(void)
 	tt_log_set_level(TT_LOG_WARN);
 
 	test_gcd();
-	test_mod();
-
+#if 0
 	test_prime("31252509122307099513722565100727743481642064519811184448629"
 		   "54305561681091773335180100000000000000000537");
 	test_mersenne();
+#endif
 	prime_distribute();
 
 	return 0;

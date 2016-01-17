@@ -107,6 +107,20 @@ int _tt_int_sanity(const struct tt_int *ti)
 	return 0;
 }
 
+void _tt_int_print(const struct tt_int *ti)
+{
+	char *s = NULL;
+	tt_int_to_string(ti, &s, 10);
+	printf("%s\n", s);
+	free(s);
+}
+
+void _tt_int_print_buf(const uint *ui, int msb)
+{
+	struct tt_int ti = _TT_INT_DECL(msb, ui);
+	_tt_int_print(&ti);
+}
+
 /* Shift integer
  * - shift: + left, - right
  * - _int buffer must be large enough

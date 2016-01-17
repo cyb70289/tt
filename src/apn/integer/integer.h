@@ -34,6 +34,8 @@ static inline bool _tt_int_is_zero(const struct tt_int *ti)
 }
 
 int _tt_int_sanity(const struct tt_int *ti);
+void _tt_int_print(const struct tt_int *ti);
+void _tt_int_print_buf(const uint *ui, int msb);
 
 int _tt_int_add_buf(uint *int1, int msb1, const uint *int2, int msb2);
 int _tt_int_sub_buf(uint *int1, int msb1, const uint *int2, int msb2);

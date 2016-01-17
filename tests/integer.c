@@ -251,11 +251,11 @@ struct tt_int *rand_int(int msb)
 		return NULL;
 
 	ti->_msb = msb;
-	do {
-		ti->_int[0] = rand() & ~(1<<31);
-	} while (ti->_int[0] == 0);
-	for (int i = 1; i < msb; i++)
+	for (int i = 0; i < msb-1; i++)
 		ti->_int[i] = rand() & ~(1<<31);
+	do {
+		ti->_int[msb-1] = rand() & ~(1<<31);
+	} while (ti->_int[msb-1] == 0);
 
 	return ti;
 }
