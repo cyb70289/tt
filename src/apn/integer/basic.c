@@ -512,6 +512,47 @@ static uint guess_quotient(const uint *_src1, int msb1,
 	return q;
 }
 
+/* Divide one word. Divisor is not normalized. */
+static int div_buf_1(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
+		const uint *dd, int msb_dd, const uint ds)
+{
+	uint64_t rem = 0;
+
+	const uint *dd_top = dd + msb_dd - 1;
+	uint *qt_top = 0;
+	if (qt) {
+		qt_top = qt + msb_dd - 1;
+		*msb_qt = msb_dd;
+	}
+
+	/* First digit */
+	if (*dd_top < ds) {
+		if (rm)
+			rem = *dd_top;
+		if (qt) {
+			*qt_top-- = 0;
+			(*msb_qt)--;
+		}
+		dd_top--;
+		msb_dd--;
+	}
+
+	while (msb_dd--) {
+		rem <<= 31;
+		rem |= *dd_top--;
+		if (qt)
+			*qt_top-- = rem / ds;
+		rem %= ds;
+	}
+
+	if (rm)
+		*rm = rem;
+	if (msb_rm)
+		*msb_rm = 1;
+
+	return 0;
+}
+
 /* Paramaters same as _tt_int_div_buf() */
 static int div_buf_classic(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
@@ -743,7 +784,7 @@ out:
 
 /* Divide: qt = dd / ds; rm = dd % ds
  * - dividend >= divisor
- * - divisor is normalized
+ * - divisor is normalized (if msb_ds > 1)
  * - qt: quotient, zeroed, size = max_quotient_words + 1
  * - rm: remainder, zeroed, size = max_remainder_words + 1
  * - msb_qt/msb_rm: quotient/remainder msb
@@ -751,6 +792,9 @@ out:
 int _tt_int_div_buf(uint *qt, int *msb_qt, uint *rm, int *msb_rm,
 		const uint *dd, int msb_dd, const uint *ds, int msb_ds)
 {
+	if (msb_ds == 1)
+		return div_buf_1(qt, msb_qt, rm, msb_rm, dd, msb_dd, *ds);
+
 	if (msb_ds < BINDIV_CROSS)
 		return div_buf_classic(qt, msb_qt, rm, msb_rm,
 				dd, msb_dd, ds, msb_ds);
@@ -908,7 +952,9 @@ int tt_int_div(struct tt_int *quo, struct tt_int *rem,
 	int msb_dd = src1->_msb;
 
 	/* Get shift bits to normalize divisor */
-	const int shift = __builtin_clz(src2->_int[src2->_msb-1]) - 1;
+	int shift = 0;
+	if (msb_ds > 1)
+		shift = __builtin_clz(ds[msb_ds-1]) - 1;
 
 	/* Allocate working buffer */
 	uint *workbuf;

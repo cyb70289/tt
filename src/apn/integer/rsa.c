@@ -144,17 +144,11 @@ static int prime_1(int bits, uint *p, int msb)
 {
 	tt_assert(msb >= 2);
 
-	int i, rounds, ret = 0;
-	uint pp;
+	int i;
+	uint rm, pp;
+	const int rounds = bits_to_rounds(bits);
 
-	rounds = bits_to_rounds(bits);
 	bits %= 31;
-
-	struct tt_int ti = _TT_INT_DECL(msb, p);
-	struct tt_int e = _TT_INT_DECL(1, &_e);
-	struct tt_int pi = _TT_INT_DECL(1, &pp);
-
-	struct tt_int *rem = tt_int_alloc();
 
 	while (1) {
 		for (i = 0; i < msb; i++)
@@ -173,25 +167,22 @@ static int prime_1(int bits, uint *p, int msb)
 
 		for (i = 0; i < ARRAY_SIZE(_primes); i++) {
 			pp = _primes[i];
-			tt_int_div(NULL, rem, &ti, &pi);
-			if (_tt_int_is_zero(rem))
+			_tt_int_div_buf(NULL, NULL, &rm, NULL, p, msb, &pp, 1);
+			if (rm == 0)
 				break;
 		}
 		if (i < ARRAY_SIZE(_primes))	/* Is composite */
 			continue;
 
-		if (!_tt_int_isprime_buf(ti._int, ti._msb, rounds))
+		if (!_tt_int_isprime_buf(p, msb, rounds))
 			continue;
 
-		ret = tt_int_div(NULL, rem, &ti, &e);
-		if (ret)
-			break;
-		if (rem->_int[0] != 1)
+		_tt_int_div_buf(NULL, NULL, &rm, NULL, p, msb, &_e, 1);
+		if (rm != 1)
 			break;
 	}
 
-	tt_int_free(rem);
-	return ret;
+	return 0;
 }
 
 static int prime_pair(int bits, uint **p, uint **q)
