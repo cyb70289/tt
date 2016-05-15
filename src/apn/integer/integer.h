@@ -48,3 +48,5 @@ int _tt_int_cmp_buf(const uint *int1, int msb1, const uint *int2, int msb2);
 int _tt_int_get_msb(const uint *ui, int len);
 
 bool _tt_int_isprime_buf(const uint *ui, int msb, int rounds);
+int _tt_int_mont_reduce(uint *r, int *msbr, const uint *c, int msbc,
+		const uint *u, int msbu, const uint *n, int msbn, uint *t);

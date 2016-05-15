@@ -192,16 +192,80 @@ void test_gcd(void)
 #endif
 }
 
+/* Test montgomery reduce */
+void test_mont(int nl)
+{
+	struct tt_int *n = rand_int(nl);
+	n->_int[0] |= 1;
+
+	int l = _tt_rand() % nl;
+	if (l == 0)
+		l = 1;
+	struct tt_int *a = rand_int(l);
+	l = _tt_rand() % nl;
+	if (l == 0)
+		l = 1;
+	struct tt_int *b = rand_int(l);
+
+	/* lambda = (2^31)^(n->_msb) */
+	struct tt_int *lambda = tt_int_alloc();
+	_tt_int_realloc(lambda, n->_msb+1);
+	lambda->_int[n->_msb] = 1;
+	lambda->_msb = n->_msb+1;
+
+	/* u = -1/n % lambda */
+	struct tt_int *u = tt_int_alloc();
+	tt_int_mod_inv(u, n, lambda);
+	if (u->_sign == 0)
+		tt_int_sub(u, lambda, u);
+
+	/* c = (a * b * lambda) % n */
+	struct tt_int *c = tt_int_alloc();
+	tt_int_mul(c, a, b);
+	tt_int_mul(c, c, lambda);
+	tt_int_div(NULL, c, c, n);
+
+	/* a = (a * lambda) % n, b = (b * lambda) % n */
+	tt_int_mul(a, a, lambda);
+	tt_int_div(NULL, a, a, n);
+	tt_int_mul(b, b, lambda);
+	tt_int_div(NULL, b, b, n);
+
+	/* d = montgomery(a * b) */
+	struct tt_int *d = tt_int_alloc();
+	tt_int_mul(d, a, b);
+	_tt_int_realloc(d, n->_msb*2+1);
+
+	uint *t = malloc((n->_msb+1)*3*4);
+	_tt_int_mont_reduce(d->_int, &d->_msb, d->_int, d->_msb,
+			u->_int, u->_msb, n->_int, n->_msb, t);
+
+	/* c == d? */
+	if (_tt_int_cmp_buf(c->_int, c->_msb, d->_int, d->_msb))
+		tt_error("Montgomery failed!");
+
+	free(t);
+	tt_int_free(a);
+	tt_int_free(b);
+	tt_int_free(n);
+	tt_int_free(lambda);
+	tt_int_free(u);
+	tt_int_free(c);
+	tt_int_free(d);
+}
+
 int main(void)
 {
 	tt_log_set_level(TT_LOG_WARN);
 
-	test_gcd();
 #if 0
 	test_prime("31252509122307099513722565100727743481642064519811184448629"
 		   "54305561681091773335180100000000000000000537");
 	test_mersenne();
+	for (int i = 1; i < 3000; i++)
+		test_mont(i % 300 + 1);
 #endif
+	test_gcd();
 	prime_distribute();
 
 	return 0;

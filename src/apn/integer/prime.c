@@ -28,31 +28,32 @@ static bool isprime_naive(uint p)
 }
 
 /* Miller-Rabin algorithm
- * - n: number to be tested
- * - r: random number in [2, n-2]
- * - m, k: n = m * 2^k, m is odd
- * - t: temporary buffer with 4*(msbn+2) size
- * - norm, msbnorm, sh: normalized n and shift bits
+ * - n, msbn: number to be tested
+ * - r, msbr: random number in [2, n-2] in montgomery form -> r*lambda % n
+ *            buffer size must >= (msb+2) uints
+ * - m, msbm, k: n = m * 2^k, m is odd
+ * - u: -1/n % 2^31
+ * - w, msbw: lambda % n
+ * - t: temporary buffer with 6*(msbn+2) uints
  */
-static bool isprime_miller_rabin_1(
-		const uint *n, int msbn, const uint *norm, int msbnorm, int sh,
-		uint *r, int msbr, const uint *m, int msbm, int k, uint *t)
+static bool isprime_miller_rabin_1(const uint *n, int msbn, uint *r, int msbr,
+		const uint *m, int msbm, int k, const uint *u, int msbu,
+		const uint *w, int msbw, uint *t)
 {
-	uint tmp;
-	int tmpi, msbx, msbt;
+	int msbx, msbt;
 	const int tsz = (msbn + 2) * 2 * 4;
 	const int xsz = (msbn + 2) * 4;
-	const int qsz = xsz, rsz = xsz;
 	uint *x = t + tsz / 4;
-	uint *q = x + xsz / 4;
+	uint *buf = x + xsz / 4;	/* (msbn+2)*3 uints */
+	const int rsz = xsz;
 
-	/* x = 1 */
-	msbx = 1;
-	x[0] = 1;
+	/* x = 1 -> lambda % n */
+	msbx = msbw;
+	memcpy(x, w, msbx*4);
 
 	/* x = r^m % n */
 	for (int i = 0; i < msbm; i++) {
-		tmp = m[i];
+		uint tmp = m[i];
 
 		int bits = 31;
 		if (i == msbm-1)
@@ -63,74 +64,53 @@ static bool isprime_miller_rabin_1(
 				/* x = (x * r) % n */
 				memset(t, 0, tsz);
 				msbt = _tt_int_mul_buf(t, x, msbx, r, msbr);
-				if (_tt_int_cmp_buf(t, msbt, n, msbn) < 0) {
-					msbx = msbt;
-					memcpy(x, t, msbx*4);
-					memset(x+msbx, 0, xsz-msbx*4);
-				} else {
-					memset(q, 0, qsz);
-					memset(x, 0, xsz);
-					msbt = _tt_int_shift_buf(t, msbt, sh);
-					_tt_int_div_buf(q, &tmpi, x, &msbx,
-							t, msbt, norm, msbnorm);
-					msbx = _tt_int_shift_buf(x, msbx, -sh);
-				}
+				_tt_int_mont_reduce(t, &msbx, t, msbt, u, msbu,
+						n, msbn, buf);
+				memcpy(x, t, msbx*4);
+				memset(x+msbx, 0, xsz-msbx*4);
 			}
 
 			/* r = r^2 % n */
 			memset(t, 0, tsz);
 			msbt = _tt_int_mul_buf(t, r, msbr, r, msbr);
-			if (_tt_int_cmp_buf(t, msbt, n, msbn) < 0) {
-				msbr = msbt;
-				memcpy(r, t, msbr*4);
-				memset(r+msbr, 0, rsz-msbr*4);
-			} else {
-				memset(q, 0, qsz);
-				memset(r, 0, rsz);
-				msbt = _tt_int_shift_buf(t, msbt, sh);
-				_tt_int_div_buf(q, &tmpi, r, &msbr,
-						t, msbt, norm, msbnorm);
-				msbr = _tt_int_shift_buf(r, msbr, -sh);
-			}
+			_tt_int_mont_reduce(t, &msbr, t, msbt, u, msbu,
+					n, msbn, buf);
+			memcpy(r, t, msbr*4);
+			memset(r+msbr, 0, rsz-msbr*4);
 
 			tmp >>= 1;
 		}
 	}
 
-	/* reuse r to store n-1 */
-	const uint one = 1;
+	/* r = n-1 -> n-lambda%n */
 	memcpy(r, n, msbn*4);
 	memset(r+msbn, 0, rsz-msbn*4);
-	msbr = _tt_int_sub_buf(r, msbn, &one, 1);
+	msbr = _tt_int_sub_buf(r, msbn, w, msbw);
 
-	/* (x == 1 || x == n-1) -> prime */
-	if ((msbx == 1 && x[0] == 1) ||
-			(msbx == msbr && memcmp(x, r, msbx*4) == 0))
+	/* prime: x == 1 -> x == lambda%n */
+	if (_tt_int_cmp_buf(x, msbx, w, msbw) == 0)
+		return true;
+	/* prime: x == n-1 -> x == n-lambda%n */
+	if (_tt_int_cmp_buf(x, msbx, r, msbr) == 0)
 		return true;
 
 	while (--k) {
 		/* x = x^2 % n */
 		memset(t, 0, tsz);
 		msbt = _tt_int_mul_buf(t, x, msbx, x, msbx);
-		if (_tt_int_cmp_buf(t, msbt, n, msbn) < 0) {
-			msbx = msbt;
-			memcpy(x, t, msbx*4);
-			memset(x+msbx, 0, xsz-msbx*4);
-		} else {
-			memset(q, 0, qsz);
-			memset(x, 0, xsz);
-			msbt = _tt_int_shift_buf(t, msbt, sh);
-			_tt_int_div_buf(q, &tmpi, x, &msbx,
-					t, msbt, norm, msbnorm);
-			msbx = _tt_int_shift_buf(x, msbx, -sh);
-		}
+		_tt_int_mont_reduce(t, &msbx, t, msbt, u, msbu, n, msbn, buf);
+		memcpy(x, t, msbx*4);
+		memset(x+msbx, 0, xsz-msbx*4);
 
-		if (msbx == 1 && x[0] == 1)
+		/* composite: x == 1 -> x == lambda%n */
+		if (_tt_int_cmp_buf(x, msbx, w, msbw) == 0)
 			return false;
-		if (msbx == msbr && memcmp(x, r, msbx*4) == 0)
+		/* prime: x == n-1 -> x == n-lambda%n */
+		if (_tt_int_cmp_buf(x, msbx, r, msbr) == 0)
 			return true;
 	}
 
+	/* composite */
 	return false;
 }
 
@@ -163,33 +143,33 @@ static int pick_rand(const uint *n, int msbn, uint *r)
 
 static bool isprime_miller_rabin(const uint *n, int msbn, int rounds)
 {
-	const int shift = __builtin_clz(n[msbn-1]) - 1;
-
 	uint *buf;
-	if (shift)
-		buf = malloc((msbn+2)*7*4);
-	else
-		buf = malloc((msbn+2)*6*4);
+	buf = malloc((msbn+2)*7*4);
 
-	uint *m = buf;			/* size = msbn+2 */
-	uint *r = m + msbn + 2;		/* size = msbn+2 */
-	uint *t = r + msbn + 2;		/* size = (msbn+2)*4 */
+	uint *m = buf;		/* (msbn+2) uints*/
+	uint *t = m + (msbn+2);	/* (msbn+2)*6 uints */
 
-	/* Normalize n for division */
-	uint *norm = (uint *)n;
-	int msbnorm = msbn;
-	if (shift) {
-		norm = t + (msbn+2)*4;
-		memcpy(norm, n, msbn*4);
-		memset(norm+msbn, 0, 8);
-		msbnorm = _tt_int_shift_buf(norm, msbn, shift);
-	}
+	struct tt_int ni = _TT_INT_DECL(msbn, n);
+
+	/* lambda = (2^31)^msbn */
+	struct tt_int *lambda = tt_int_alloc();
+	_tt_int_realloc(lambda, msbn+1);
+	lambda->_int[msbn] = 1;
+	lambda->_msb = msbn+1;
+
+	/* u = -1/n % lambda, u >= 0 */
+	struct tt_int *u = tt_int_alloc();
+	tt_int_mod_inv(u, &ni, lambda);
+	if (u->_sign == 0)
+		tt_int_sub(u, lambda, u);
+	/* w = lambda % n */
+	struct tt_int *w = tt_int_alloc();
+	tt_int_div(NULL, w, lambda, &ni);
 
 	/* n-1 = m * 2^k */
 	int k = 0, msbm = msbn;
 	memcpy(m, n, msbn*4);
 	m[0]--;
-
 	/* Shift by word */
 	while (m[0] == 0) {
 		for (int i = 0; i < msbm-1; i++)
@@ -197,23 +177,36 @@ static bool isprime_miller_rabin(const uint *n, int msbn, int rounds)
 		msbm--;
 		k += 31;
 	}
-
 	/* Shift by bit */
 	const int rsh = __builtin_ctz(m[0]);
 	msbm = _tt_int_shift_buf(m, msbm, -rsh);
 	k += rsh;
 
 	bool ret = true;
+	struct tt_int *r = tt_int_alloc();
+	_tt_int_realloc(r, msbn+2);
 	while (rounds--) {
-		int msbr = pick_rand(n, msbn, r);
-		if (!isprime_miller_rabin_1(n, msbn, norm, msbnorm, shift,
-					r, msbr, m, msbm, k, t)) {
+		r->_msb = pick_rand(n, msbn, r->_int);
+		/* r -> r*lambda % n */
+		memset(t, 0, (msbn+2)*2*4);
+		int msbt = _tt_int_mul_buf(t, r->_int, r->_msb,
+				lambda->_int, lambda->_msb);
+		struct tt_int ti = _TT_INT_DECL(msbt, t);
+		tt_int_div(NULL, r, &ti, &ni);
+
+		if (!isprime_miller_rabin_1(n, msbn, r->_int, r->_msb, m, msbm,
+				k, u->_int, u->_msb, w->_int, w->_msb, t)) {
 			ret = false;
 			break;
 		}
+		_tt_int_zero(r);
 	}
 
 	free(buf);
+	tt_int_free(lambda);
+	tt_int_free(u);
+	tt_int_free(w);
+	tt_int_free(r);
 	return ret;
 }
 

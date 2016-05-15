@@ -246,7 +246,7 @@ int tt_int_extgcd(struct tt_int *g, struct tt_int *u, struct tt_int *v,
 	/* Adjust coefficient sign */
 	if (a->_sign)
 		u->_sign ^= 1;
-	if (b->_sign && v)
+	if (b->_sign)
 		v->_sign ^= 1;
 
 	free(buf);
