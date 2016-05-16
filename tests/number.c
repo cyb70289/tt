@@ -88,7 +88,7 @@ void prime_distribute(void)
 		._int = r,
 	};
 
-	/* In theory, there should be 100 primes in pcnt100 tries  */
+	/* In theory, there're about 100 primes in pcnt100 tries  */
 	uint pcnt100 = (uint)(log(2.0) * 31.0 * NN * 100.0);
 	uint pcnt = 0;
 

@@ -7,7 +7,7 @@
 #include <common/lib.h>
 #include "integer.h"
 
-#include "string.h"
+#include <string.h>
 
 /* Naive algorithm (p < 2^31) */
 static bool isprime_naive(uint p)
@@ -47,38 +47,39 @@ static bool isprime_miller_rabin_1(const uint *n, int msbn, uint *r, int msbr,
 	uint *buf = x + xsz / 4;	/* (msbn+2)*3 uints */
 	const int rsz = xsz;
 
-	/* x = 1 -> lambda % n */
-	msbx = msbw;
-	memcpy(x, w, msbx*4);
+	/* x = r */
+	msbx = msbr;
+	memcpy(x, r, msbr*4);
 
 	/* x = r^m % n */
-	for (int i = 0; i < msbm; i++) {
+	for (int i = msbm-1; i >= 0; i--) {
 		uint tmp = m[i];
 
 		int bits = 31;
-		if (i == msbm-1)
-			bits = 32 - __builtin_clz(tmp);
+		if (i == msbm-1) {
+			bits = 31 - __builtin_clz(tmp);
+			tmp <<= (31 - bits);
+		}
 
 		while (bits--) {
-			if ((tmp & 0x1)) {
+			/* x = x^2 % n */
+			memset(t, 0, tsz);
+			msbt = _tt_int_mul_buf(t, x, msbx, x, msbx);
+			_tt_int_mont_reduce(t, &msbx, t, msbt, u, msbu,
+					n, msbn, buf);
+			memcpy(x, t, msbx*4);
+
+			if ((tmp & BIT(30))) {
 				/* x = (x * r) % n */
 				memset(t, 0, tsz);
 				msbt = _tt_int_mul_buf(t, x, msbx, r, msbr);
 				_tt_int_mont_reduce(t, &msbx, t, msbt, u, msbu,
 						n, msbn, buf);
 				memcpy(x, t, msbx*4);
-				memset(x+msbx, 0, xsz-msbx*4);
 			}
+			memset(x+msbx, 0, xsz-msbx*4);
 
-			/* r = r^2 % n */
-			memset(t, 0, tsz);
-			msbt = _tt_int_mul_buf(t, r, msbr, r, msbr);
-			_tt_int_mont_reduce(t, &msbr, t, msbt, u, msbu,
-					n, msbn, buf);
-			memcpy(r, t, msbr*4);
-			memset(r+msbr, 0, rsz-msbr*4);
-
-			tmp >>= 1;
+			tmp <<= 1;
 		}
 	}
 

@@ -7,7 +7,7 @@
 #include <common/lib.h>
 #include "integer.h"
 
-#include "string.h"
+#include <string.h>
 
 static const uint _e = 65537;
 
@@ -261,7 +261,7 @@ static int prime_1(int bits, uint *p, int msb)
 			if (rm == 0)
 				break;
 		}
-		if (i < ARRAY_SIZE(_primes))	/* Is composite */
+		if (i < ARRAY_SIZE(_primes))
 			continue;
 
 		if (!_tt_int_isprime_buf(p, msb, rounds))
@@ -280,12 +280,10 @@ static int prime_pair(int bits, uint **p, uint **q)
 	tt_assert((bits & 0x1) == 0);
 	bits /= 2;
 
-	int ret = 0;
-	int msb = (bits + 30) / 31;
+	int ret, msb = (bits + 30) / 31;
 
-	void *buf = malloc(msb*2*4);
-	*p = buf;
-	*q = (*p) + msb;
+	*p = malloc(msb*4);
+	*q = malloc(msb*4);
 
 	ret = prime_1(bits, *p, msb);
 	if (ret)
@@ -299,6 +297,7 @@ static int prime_pair(int bits, uint **p, uint **q)
 	return 0;
 
 err:
-	free(buf);
+	free(*p);
+	free(*q);
 	return ret;
 }

@@ -10,8 +10,8 @@
 #include <string.h>
 #include <math.h>
 
-#define KARA_CROSS	200	/* Karatsuba multiplication cross point */
-#define BINDIV_CROSS	9	/* Divide and conquer division cross point */
+#define KARA_CROSS	24	/* Karatsuba multiplication cross point */
+#define BINDIV_CROSS	35	/* Divide and conquer division cross point */
 
 /* Add two int and carry
  * - i1, i2 < 2^31
@@ -209,40 +209,6 @@ int _tt_int_cmp_buf(const uint *int1, int msb1, const uint *int2, int msb2)
 	return 0;
 }
 
-#ifdef __SIZEOF_INT128__
-static int from128(uint out[5], __uint128_t i128)
-{
-	int msb = 0;
-
-	while (i128) {
-		out[msb++] = i128 & (BIT(31) - 1);
-		i128 >>= 31;
-	}
-	for (int i = msb; i < 5; i++)
-		out[i] = 0;
-
-	if (msb == 0)
-		msb = 1;
-	return msb;
-}
-#else
-static int from64(uint out[3], uint64_t i64)
-{
-	int msb = 0;
-
-	while (i64) {
-		out[msb++] = i64 & (BIT(31) - 1);
-		i64 >>= 31;
-	}
-	for (int i = msb; i < 3; i++)
-		out[i] = 0;
-
-	if (msb == 0)
-		msb = 1;
-	return msb;
-}
-#endif
-
 static int get_uints(const uint *ui, int len)
 {
 	while (len) {
@@ -270,42 +236,89 @@ int _tt_int_get_msb(const uint *ui, int len)
  * - intr is zeroed
  * - return result length
  */
-static int mul_buf_classic(uint *intr, const uint *int1, const int msb1,
-		const uint *int2, const int msb2)
+static int mul_buf_classic(uint *intr, const uint *int1, int msb1,
+		const uint *int2, int msb2)
 {
-	int msb = 1;
+	uint c, *r = intr;
+	uint64_t t0, t1, t2, t3, m;
 
-	for (int i = 0; i < msb1 + msb2; i++) {
-		int jmax = i;
-		if (jmax >= msb1)
-			jmax = msb1 - 1;
-		int jmin = i - msb2 + 1;
-		if (jmin < 0)
-			jmin = 0;
+	/* Square can be faster */
+	if (_tt_unlikely(int1 == int2 && msb1 == msb2)) {
+		for (int i = 0; i < msb1; i++) {
+			t0 = (uint64_t)int1[i]*int1[i] + r[i];
+			r[i] = t0 & (BIT(31)-1);
+			c = t0 >> 31;
+			m = int1[i] << 1;
 
-#ifdef __SIZEOF_INT128__
-		/* XXX: int128 may overflow if both operands >= 10^(10^21) */
-		__uint128_t tmp128 = 0;
-		uint tmp[5];
-		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++)
-			tmp128 += (uint64_t)int1[j] * int2[k];
-		int msbt = from128(tmp, tmp128);
-		msb = _tt_int_add_buf(intr+i, msb-i, tmp, msbt) + i;
-#else
-		uint tmp[3];
-		for (int j = jmax, k = i - jmax; j >= jmin; j--, k++) {
-			uint64_t tmp64 = (uint64_t)int1[j] * int2[k];
-			int msbt = from64(tmp, tmp64);
-			msb = _tt_int_add_buf(intr+i, msb-i, tmp, msbt) + i;
+			int j = i + 1;
+			for (; j <= msb1-4; j += 4) {
+				t0 = m * int1[j] + r[j];
+				t1 = m * int1[j+1] + r[j+1];
+				t2 = m * int1[j+2] + r[j+2];
+				t3 = m * int1[j+3] + r[j+3];
+
+				t0 += c;
+				r[j] = t0 & (BIT(31)-1);
+				t1 += t0 >> 31;
+				r[j+1] = t1 & (BIT(31)-1);
+				t2 += t1 >> 31;
+				r[j+2] = t2 & (BIT(31)-1);
+				t3 += t2 >> 31;
+				r[j+3] = t3 & (BIT(31)-1);
+				c = t3 >> 31;
+			}
+			for (; j < msb1; j++) {
+				t0 = (m * int1[j] + r[j]) + c;
+				c = t0 >> 31;
+				r[j] = t0 & (BIT(31)-1);
+			}
+			r[msb1] = c;
+
+			r++;
 		}
-#endif
+	} else {
+		if (msb1 > msb2) {
+			__tt_swap(msb1, msb2);
+			__tt_swap(int1, int2);
+		}
+
+		for (int i = 0; i < msb1; i++) {
+			c = 0;
+			m = int1[i];
+
+			int j = 0;
+			for (; j <= msb2-4; j += 4) {
+				t0 = m * int2[j] + r[j];
+				t1 = m * int2[j+1] + r[j+1];
+				t2 = m * int2[j+2] + r[j+2];
+				t3 = m * int2[j+3] + r[j+3];
+
+				t0 += c;
+				r[j] = t0 & (BIT(31)-1);
+				t1 += t0 >> 31;
+				r[j+1] = t1 & (BIT(31)-1);
+				t2 += t1 >> 31;
+				r[j+2] = t2 & (BIT(31)-1);
+				t3 += t2 >> 31;
+				r[j+3] = t3 & (BIT(31)-1);
+				c = t3 >> 31;
+			}
+			for (; j < msb2; j++) {
+				t0 = (m * int2[j] + r[j]) + c;
+				c = t0 >> 31;
+				r[j] = t0 & (BIT(31)-1);
+			}
+			r[msb2] = c;
+
+			r++;
+		}
 	}
 
 	/* Top int may be 0 */
-	if (intr[msb-1] == 0 && msb > 1)
+	int msb = msb1 + msb2;
+	if (intr[msb-1] == 0)
 		msb--;
 
-	tt_assert_fa(msb == (msb1+msb2) || msb == (msb1+msb2-1));
 	return msb;
 }
 
@@ -380,10 +393,12 @@ static int mul_buf_kara(uint *intr, const uint *int1, int msb1,
 
 	/* On unbalanced input, Karatsuba performs even worse than classic
 	 * algorithm. Fix it by spliting long input into pieces of the same
-	 * size as short input .
+	 * size as short input.
 	 */
 	if (msb2 >= msb1*2)
 		return mul_buf_unbalanced(intr, int1, msb1, int2, msb2, workbuf);
+
+	const int square = (int1 == int2 && msb1 == msb2);
 
 	const int div = msb2 / 2;
 	int msb_a = msb1 - div;
@@ -399,7 +414,8 @@ static int mul_buf_kara(uint *intr, const uint *int1, int msb1,
 		msb_bd = mul_buf_kara(intr, int1, msb_b, int2, msb_d, workbuf);
 
 	/* A*C -> intr+div*2 */
-	msb_ac = mul_buf_kara(intr+div*2, int1+div, msb_a, int2+div, msb_c, workbuf);
+	msb_ac = mul_buf_kara(intr+div*2, int1+div, msb_a, int2+div, msb_c,
+			workbuf);
 	msb = msb_ac + div*2;
 
 	/* A*D+B*C */
@@ -408,32 +424,54 @@ static int mul_buf_kara(uint *intr, const uint *int1, int msb1,
 		uint *c_d = a_b + (div + 2);
 		uint *ad_bc = c_d + (div + 2);
 		uint *nextbuf = ad_bc + 2 * (div + 2);
+		int msb_ad_bc;
 		const int bufsz = 4 * (div + 2);
 		memset(workbuf, 0, bufsz * 4);
 
-		/* A+B */
-		int msb_a_b = msb_a;
-		memcpy(a_b, int1+div, msb_a*4);
-		if (msb_b)
-			msb_a_b = _tt_int_add_buf(a_b, msb_a_b, int1, msb_b);
+		if (_tt_unlikely(square)) {
+			/* Square: AD*2 */
+			msb_ad_bc = mul_buf_kara(ad_bc, int1+div, msb_a,
+					int2, msb_d, nextbuf);
+			uint c = 0;
+			for (int i = 0; i < msb_ad_bc; i++) {
+				ad_bc[i] <<= 1;
+				ad_bc[i] += c;
+				if (ad_bc[i] & BIT(31)) {
+					ad_bc[i] -= BIT(31);
+					c = 1;
+				} else {
+					c = 0;
+				}
+			}
+			if (c)
+				ad_bc[msb_ad_bc++] = 1;
+		} else {
+			/* A+B */
+			int msb_a_b = msb_a;
+			memcpy(a_b, int1+div, msb_a*4);
+			if (msb_b)
+				msb_a_b = _tt_int_add_buf(a_b, msb_a_b,
+						int1, msb_b);
 
-		/* C+D */
-		int msb_c_d = msb_c;
-		memcpy(c_d, int2+div, msb_c*4);
-		if (msb_d)
-			msb_c_d = _tt_int_add_buf(c_d, msb_c_d, int2, msb_d);
+			/* C+D */
+			int msb_c_d = msb_c;
+			memcpy(c_d, int2+div, msb_c*4);
+			if (msb_d)
+				msb_c_d = _tt_int_add_buf(c_d, msb_c_d,
+						int2, msb_d);
 
-		/* A*D+B*C = (A+B)*(C+D)-A*C-B*D */
-		int msb_ad_bc = mul_buf_kara(ad_bc, a_b, msb_a_b, c_d, msb_c_d,
-				nextbuf);
-		msb_ad_bc = _tt_int_sub_buf(ad_bc, msb_ad_bc, intr+div*2, msb_ac);
-		if (msb_bd)
-			msb_ad_bc = _tt_int_sub_buf(ad_bc, msb_ad_bc, intr, msb_bd);
+			/* A*D+B*C = (A+B)*(C+D)-A*C-B*D */
+			msb_ad_bc = mul_buf_kara(ad_bc, a_b, msb_a_b,
+					c_d, msb_c_d, nextbuf);
+			msb_ad_bc = _tt_int_sub_buf(ad_bc, msb_ad_bc,
+					intr+div*2, msb_ac);
+			if (msb_bd)
+				msb_ad_bc = _tt_int_sub_buf(ad_bc, msb_ad_bc,
+						intr, msb_bd);
+		}
 
 		/* Sum all */
 		int msb2 = msb - div;
-		if (msb2 <= 0)
-			msb2 = 1;
 		msb = _tt_int_add_buf(intr+div, msb2, ad_bc, msb_ad_bc) + div;
 	}
 
@@ -453,10 +491,17 @@ int _tt_int_mul_buf(uint *intr, const uint *int1, int msb1,
 	if ((msb1 == 1 && int1[0] == 0) || (msb2 == 1 && int2[0] == 0))
 		return 1;
 
-	const int msbmax = _tt_max(msb1, msb2);
+	int msbmin, msbmax;
+	if (msb1 > msb2) {
+		msbmax = msb1;
+		msbmin = msb2;
+	} else {
+		msbmax = msb2;
+		msbmin = msb1;
+	}
 
 	/* Use classic algorithm when input size below crosspoint */
-	if (msbmax < KARA_CROSS)
+	if (msbmin < KARA_CROSS)
 		return mul_buf_classic(intr, int1, msb1, int2, msb2);
 
 	/* Allocate working buffer for Karatsuba algorithm */
