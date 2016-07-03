@@ -19,12 +19,17 @@ int tt_int_factorial(struct tt_int *ti, const int n)
 	}
 
 	/* Allocate buffers */
-	uint *ibuf = malloc(n * 4 * 3);
-	if (ibuf == NULL)
+	_tt_word *buf = malloc(n * 2 * _tt_word_sz);
+	if (buf == NULL)
 		return TT_ENOMEM;
-	uint *oper = ibuf;
-	uint *result = ibuf + n;
-	int *msb = (int*)result + n;
+	_tt_word *oper = buf;
+	_tt_word *result = oper + n;
+
+	int *msb = malloc(n * sizeof(int));
+	if (msb == NULL) {
+		free(buf);
+		return TT_ENOMEM;
+	}
 
 	/* Initialize operators */
 	for (int i = 0; i < n; i++) {
@@ -36,13 +41,13 @@ int tt_int_factorial(struct tt_int *ti, const int n)
 	int ops = n, ret = 0;
 	while (ops > 1) {
 		__tt_swap(oper, result);
-		memset(result, 0, n * 4);
+		memset(result, 0, n * _tt_word_sz);
 
 		int i, j;
-		uint *o = oper, *r = result;
+		_tt_word *o = oper, *r = result;
 
 		for (i = j = 0; i < ops/2; i++, j += 2) {
-			uint *o2 = o + msb[j];
+			_tt_word *o2 = o + msb[j];
 			msb[i] = _tt_int_mul_buf(r, o, msb[j], o2, msb[j+1]);
 			if (msb[i] < 0) {
 				ret = msb[i];
@@ -53,14 +58,14 @@ int tt_int_factorial(struct tt_int *ti, const int n)
 		}
 		if (j < ops) {
 			/* ops is odd */
-			memcpy(r, o, msb[j] * 4);
+			memcpy(r, o, msb[j] * _tt_word_sz);
 			msb[i] = msb[j];
 			i++;
 		}
 		ops = i;
 
-		tt_assert_fa((o-oper) <= n*4);
-		tt_assert_fa((r-result) <= n*4);
+		tt_assert_fa((o-oper) <= n*_tt_word_sz);
+		tt_assert_fa((r-result) <= n*_tt_word_sz);
 	}
 	tt_assert(ops == 1);
 
@@ -72,10 +77,11 @@ int tt_int_factorial(struct tt_int *ti, const int n)
 	} else {
 		_tt_int_zero(ti);
 	}
-	memcpy(ti->_int, result, msb[0] * 4);
-	ti->_msb = msb[0];
+	memcpy(ti->buf, result, msb[0] * _tt_word_sz);
+	ti->msb = msb[0];
 
 out:
-	free(ibuf);
+	free(buf);
+	free(msb);
 	return ret;
 }

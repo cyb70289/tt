@@ -207,7 +207,7 @@ static const ushort _primes[] = {
 /* Test rounds to achieve 2^-80 error bound
  * - From "Handbook of Applied Cryptography"
  */
-static int bits_to_rounds(int bits)
+int _tt_int_ml_rounds(int bits)
 {
 	static const struct {
 		int bits;
@@ -230,35 +230,38 @@ static int bits_to_rounds(int bits)
  * - highest two bits and lowest bit are set
  * - p % _e != 1
  */
-static int prime_1(int bits, uint *p, int msb)
+static int prime_1(int bits, _tt_word *p, int msb)
 {
 	tt_assert(msb >= 2);
 
 	int i;
-	uint rm, pp;
-	const int rounds = bits_to_rounds(bits);
+	const int rounds = _tt_int_ml_rounds(bits);
 
-	bits %= 31;
+	bits %= _tt_word_bits;
 
 	while (1) {
-		for (i = 0; i < msb; i++)
+		for (i = 0; i < msb; i++) {
 			p[i] = _tt_rand() & ~BIT(31);
+#ifdef _TT_LP64_
+			p[i] <<= 32;
+			p[i] |= _tt_rand();
+#endif
+		}
 		/* Set highest two bits and lowest bit */
 		p[0] |= 0x1;
 		if (bits == 0) {
-			p[msb-1] |= 0x3 << 29;
+			p[msb-1] |= ((_tt_word_top_bit >> 1) |
+				(_tt_word_top_bit >> 2));
 		} else if (bits == 1) {
 			p[msb-1] = 1;
-			p[msb-2] |= BIT(30);
+			p[msb-2] |= (_tt_word_top_bit >> 1);
 		} else {
-			p[msb-1] |= 0x3 << (bits-2);
-			p[msb-1] &= ((1 << bits) - 1);
+			p[msb-1] |= 0x3ULL << (bits-2);
+			p[msb-1] &= ((1ULL << bits) - 1);
 		}
 
 		for (i = 1; i < ARRAY_SIZE(_primes); i++) {
-			pp = _primes[i];
-			_tt_int_div_buf(NULL, NULL, &rm, NULL, p, msb, &pp, 1);
-			if (rm == 0)
+			if (_tt_int_mod_uint(p, msb, _primes[i]) == 0)
 				break;
 		}
 		if (i < ARRAY_SIZE(_primes))
@@ -267,23 +270,22 @@ static int prime_1(int bits, uint *p, int msb)
 		if (!_tt_int_isprime_buf(p, msb, rounds))
 			continue;
 
-		_tt_int_div_buf(NULL, NULL, &rm, NULL, p, msb, &_e, 1);
-		if (rm != 1)
+		if (_tt_int_mod_uint(p, msb, _e) != 1)
 			break;
 	}
 
 	return 0;
 }
 
-static int prime_pair(int bits, uint **p, uint **q)
+static int prime_pair(int bits, _tt_word **p, _tt_word **q)
 {
 	tt_assert((bits & 0x1) == 0);
 	bits /= 2;
 
-	int ret, msb = (bits + 30) / 31;
+	int ret, msb = (bits+_tt_word_bits-1)/_tt_word_bits;
 
-	*p = malloc(msb*4);
-	*q = malloc(msb*4);
+	*p = malloc(msb*_tt_word_sz);
+	*q = malloc(msb*_tt_word_sz);
 
 	ret = prime_1(bits, *p, msb);
 	if (ret)
@@ -292,7 +294,7 @@ static int prime_pair(int bits, uint **p, uint **q)
 		ret = prime_1(bits, *q, msb);
 		if (ret)
 			goto err;
-	} while (memcmp(*p, *q, msb*4) == 0);
+	} while (memcmp(*p, *q, msb*_tt_word_sz) == 0);
 
 	return 0;
 

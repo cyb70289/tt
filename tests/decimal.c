@@ -26,12 +26,12 @@ static double gen_float(int mexp)
 	};
 
 	/* Sign: 0,1 */
-	if ((rand() & 1))
+	if (rand() & 1)
 		v.i |= 1ULL << 63;
 
 	/* Exponent: -mexp ~ +mexp */
 	double _exp = (double)(rand() % (mexp + 1));	/* 0 ~ mexp */
-	if ((rand() & 1))
+	if (rand() & 1)
 		_exp = -_exp;
 	int e = 1023;
 	if (_exp > 0)

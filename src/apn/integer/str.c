@@ -34,14 +34,13 @@ static char ascii_to_bin[] = {
 };
 
 /* Divide "dividend" by 10^9 and store quotient to "quo", return remainder
- * - *len = valid uints in "dividend" on entry, valid uints in "quo" on exit
- * - "quo" is zeroed on entry
+ * - *len = valid words in "dividend" on entry, valid words in "quo" on exit
+ * - "quo" must be zeroed on entry
  */
-static uint div_dec9(const uint *dividend, uint *quo, int *len)
+static uint div_dec9(const _tt_word *dividend, _tt_word *quo, int *len)
 {
-	const int uints = *len;
-
-	const uint *ddptr = dividend + uints - 1;
+	const int words = *len;
+	const _tt_word *ddptr = dividend + words - 1;
 	uint64_t rem = 0;
 
 	/* First quotient digit */
@@ -53,12 +52,28 @@ static uint div_dec9(const uint *dividend, uint *quo, int *len)
 
 	/* Other quotient digits */
 	for (int i = *len-1; i >= 0; i--) {
-		rem *= BIT(31);
-		rem += *ddptr--;
+		_tt_word dd = *ddptr--;
+#ifdef _TT_LP64_
+		/* Split 63 bits into 2 uint. 64 bit division is much faster
+		 * than 128 bit division.
+		 */
+		rem <<= 31;
+		rem |= (dd >> 32);
 		quo[i] = rem / 1000000000;
 		rem %= 1000000000;
-	}
+		quo[i] <<= 32;
 
+		rem <<= 32;
+		rem |= (uint)dd;
+		quo[i] |= rem / 1000000000;
+		rem %= 1000000000;
+#else
+		rem <<= 31;
+		rem |= dd;
+		quo[i] = rem / 1000000000;
+		rem %= 1000000000;
+#endif
+	}
 	return rem;
 }
 
@@ -68,11 +83,11 @@ static uint div_dec9(const uint *dividend, uint *quo, int *len)
  * - lshift: left shifted bits of _int
  * - dec buffer must be large enough
  */
-static int int_to_dec(uint *_int, int msb_int, int lshift,
+static int int_to_dec(_tt_word *_int, int msb_int, int lshift,
 		uint *dec, int msb_dec)
 {
-	/* Adopt classic way on small input */
 	if (msb_int < dec9[DEC9_CROSS_IDX].msb * 2) {
+		/* Adopt classic way on small input */
 		/* Shift back */
 		msb_int = _tt_int_shift_buf(_int, msb_int, -lshift);
 
@@ -80,12 +95,12 @@ static int int_to_dec(uint *_int, int msb_int, int lshift,
 			return 0;
 
 		int len = 0;
-		uint *workbuf = malloc(msb_int * 4);
-		uint *quo = workbuf;
+		void *workbuf = malloc(msb_int*_tt_word_sz);
+		_tt_word *quo = workbuf;
 
 		/* Divide 10^9 till quotient = 0 */
 		while (msb_int) {
-			memset(quo, 0, msb_int * 4);
+			memset(quo, 0, msb_int*_tt_word_sz);
 			dec[len++] = div_dec9(_int, quo, &msb_int);
 			__tt_swap(_int, quo);
 		}
@@ -95,7 +110,7 @@ static int int_to_dec(uint *_int, int msb_int, int lshift,
 		return 0;
 	}
 
-	/* Adopt divide & conquer approach */
+	/* Divide & Conquer */
 	int ret = 0;
 
 	/* Pick max radix */
@@ -112,11 +127,11 @@ static int int_to_dec(uint *_int, int msb_int, int lshift,
 	/* Allocate working buffer */
 	int msb_qt = msb_int - dec9[idx].msb + 2;	/* One extra word */
 	int msb_rm = dec9[idx].msb + 1;			/* " */
-	void *workbuf = calloc(msb_qt + msb_rm, 4);
+	void *workbuf = calloc(msb_qt+msb_rm, _tt_word_sz);
 	if (!workbuf)
 		return TT_ENOMEM;
-	uint *qt = workbuf;
-	uint *rm = qt + msb_qt;
+	_tt_word *qt = workbuf;
+	_tt_word *rm = qt + msb_qt;
 
 	/* Divide 10^n */
 	ret = _tt_int_div_buf(qt, &msb_qt, rm, &msb_rm,
@@ -129,7 +144,7 @@ static int int_to_dec(uint *_int, int msb_int, int lshift,
 	ret = int_to_dec(rm, msb_rm, dec9[idx].shift, dec, msb_dec9);
 	if (ret)
 		goto out;
-	ret = int_to_dec(qt, msb_qt, 0, dec + msb_dec9, msb_dec - msb_dec9);
+	ret = int_to_dec(qt, msb_qt, 0, dec+msb_dec9, msb_dec-msb_dec9);
 
 out:
 	free(workbuf);
@@ -142,7 +157,7 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 
 	/* Check leading "+", "-" */
 	if (*str == '-') {
-		ti->_sign = 1;
+		ti->sign = 1;
 		str++;
 	} else if (*str == '+') {
 		str++;
@@ -193,8 +208,8 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 	tt_assert(bits);
 
 	/* Re-allocate buffer if required */
-	const uint uints = (bits + 30) / 31;
-	int ret = _tt_int_realloc(ti, uints);
+	const uint words = (bits+_tt_word_bits-1) / _tt_word_bits;
+	int ret = _tt_int_realloc(ti, words);
 	if (ret)
 		return ret;
 
@@ -203,25 +218,23 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 		s -= digs;	/* First digit */
 
 		const uint len = (digs + 8) / 9;
-		int lt = digs % 9;	/* Digits in top uint */
+		int lt = digs % 9;	/* Digits in top word */
 		if (lt == 0)
 			lt = 9;
 
-		uint msb = 1;	/* Valid uints in product */
-		uint *product = ti->_int;
-		uint carry;
-		uint64_t m;
+		int msb = 1;	/* Valid words in product */
+		_tt_word *product = ti->buf;
+		_tt_word carry;
+		_tt_word_double m;
 		for (uint i = 0; i < len; i++) {
 			/* Multiply product by 10^9 */
 			carry = 0;
 			for (uint j = 0; j < msb; j++) {
-				m = product[j] * 1000000000ULL;
+				m = product[j];
+				m *= 1000000000;
 				m += carry;
-				carry = m >> 31;
-				if (carry)
-					product[j] = m & (BIT(31)-1);
-				else
-					product[j] = m;
+				carry = m >> _tt_word_bits;
+				product[j] = m & ~_tt_word_top_bit;
 			}
 			if (carry)
 				product[msb++] = carry;
@@ -237,46 +250,47 @@ int tt_int_from_string(struct tt_int *ti, const char *str)
 			/* Add 9 new decimal digits */
 			carry = dig9;
 			for (uint j = 0; j < msb; j++) {
-				m = product[j] + carry;
-				carry = m >> 31;
-				if (carry) {
-					product[j] = m & (BIT(31)-1);
-				} else {
-					product[j] = m;
+				m = product[j];
+				m += carry;
+				carry = m >> _tt_word_bits;
+				product[j] = m;
+				if (carry)
+					product[j] &= ~_tt_word_top_bit;
+				else
 					break;
-				}
 			}
 			if (carry)
 				product[msb++] = carry;
 		}
-		ti->_msb = msb;
+		ti->msb = msb;
 		tt_assert(*s == '\0');
 	} else {
-		int cur_int = -1, cur_bit = 30;
+		int cur_word = -1, cur_bit = _tt_word_bits-1;
+		_tt_word mask = 0;
 
 		s--;	/* Last digit */
 		while (s >= str) {
 			int c = ascii_to_bin[(uchar)*s];
 			for (int i = radix; i > 1; i >>= 1) {
 				cur_bit++;
-				if (cur_bit == 31) {
+				mask <<= 1;
+				if (cur_bit == _tt_word_bits) {
 					cur_bit = 0;
-					cur_int++;
+					mask = 1;
+					cur_word++;
 				}
-				if ((c & 1))
-					ti->_int[cur_int] |= BIT(cur_bit);
+				if (c & 1)
+					ti->buf[cur_word] |= mask;
 				c >>= 1;
 			}
 			s--;
 		}
 
-		ti->_msb = cur_int + 1;
-		tt_assert(ti->_msb && ti->_msb <= ti->_max);
+		ti->msb = cur_word + 1;
 		/* Top int may be 0 */
-		if (ti->_int[ti->_msb-1] == 0) {
-			ti->_msb--;
-			tt_assert(ti->_msb);
-		}
+		if (ti->buf[ti->msb-1] == 0)
+			ti->msb--;
+		tt_assert(ti->msb && ti->msb <= ti->_max);
 	}
 
 	return 0;
@@ -287,8 +301,8 @@ int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
 	if (*str)
 		tt_warn("Possible memory leak: str != NULL");
 
-	/* Allocate digit buffer (in 31 bits granularity) */
-	uint bits = ti->_msb * 31, digs;
+	/* Allocate digit buffer */
+	uint bits = ti->msb * _tt_word_bits, digs;
 	int rbits = 0;
 	const char *prefix;
 	if (radix == 2) {
@@ -315,7 +329,7 @@ int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
 		return TT_ENOMEM;
 	*str = s;
 
-	if (ti->_sign)
+	if (ti->sign)
 		*s++ = '-';
 
 	if (_tt_int_is_zero(ti)) {
@@ -329,16 +343,17 @@ int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
 
 	/* Integer to string conversion */
 	if (radix == 10) {
-		int msb_int = ti->_msb + 1;
+		int msb_int = ti->msb + 1;
 		int msb_dec = (digs + 8) / 9 + 1;
-		void *workbuf = calloc(msb_int + msb_dec, 4);
+		void *workbuf = malloc(msb_int*_tt_word_sz + msb_dec*4);
 		if (!workbuf)
 			return TT_ENOMEM;
-		uint *intbuf = workbuf;
-		uint *decbuf = intbuf + msb_int;
+		_tt_word *intbuf = workbuf;
+		uint *decbuf = workbuf + msb_int*_tt_word_sz;
 
-		memcpy(intbuf, ti->_int, ti->_msb * 4);
-		int err = int_to_dec(intbuf, ti->_msb, 0, decbuf, msb_dec);
+		memcpy(intbuf, ti->buf, ti->msb * _tt_word_sz);
+		memset(decbuf, 0, msb_dec * 4);
+		int err = int_to_dec(intbuf, ti->msb, 0, decbuf, msb_dec);
 		if (err) {
 			free(workbuf);
 			return err;
@@ -391,35 +406,29 @@ int tt_int_to_string(const struct tt_int *ti, char **str, int radix)
 		free(workbuf);
 	} else {
 		/* Get total digits */
-		int i;
-		uint d = ti->_int[ti->_msb-1];
-		for (i = 30; i >= 0; i--) {
-			if ((d & BIT(30)))
-				break;
-			d <<= 1;
-		}
-		tt_assert(i >= 0);
-		bits = (ti->_msb - 1) * 31 + i + 1;
+		int msb_bits = _tt_int_word_bits(ti->buf[ti->msb-1]);
+		tt_assert(msb_bits);
+		bits = (ti->msb - 1) * _tt_word_bits + msb_bits;
 		digs = (bits + rbits - 1) / rbits;
 
 		s += (digs-1);
-		uint cur_int = 0, cur_bit = 0;
-		d = ti->_int[0];
+		int cur_word = 0, cur_bit = 0, i;
+		_tt_word d = ti->buf[0];
 		while (digs--) {
 			cur_bit += rbits;
-			if (cur_bit < 31) {
+			if (cur_bit < _tt_word_bits) {
 				i = d & (radix-1);
 				d >>= rbits;
 			} else {
-				cur_bit -= 31;
+				cur_bit -= _tt_word_bits;
 				i = d;
-				d = ti->_int[++cur_int];
+				d = ti->buf[++cur_word];
 				i |= ((d << (rbits-cur_bit)) & (radix-1));
 				d >>= cur_bit;
 			}
 			*s-- = bin_to_ascii[i];
 		}
-		tt_assert(cur_int == ti->_msb || cur_int == ti->_msb-1);
+		tt_assert(cur_word == ti->msb || cur_word == ti->msb-1);
 		tt_assert(*(s+1) != '0');
 	}
 

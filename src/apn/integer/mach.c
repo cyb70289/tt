@@ -9,17 +9,15 @@
 
 int tt_int_from_uint(struct tt_int *ti, uint64_t num)
 {
-	tt_assert(ti->_max >= 3);
-
 	_tt_int_zero(ti);
 
-	ti->_int[0] = num & (BIT(31)-1);
-	num >>= 31;
+	ti->buf[0] = num & ~_tt_word_top_bit;
+	num >>= _tt_word_bits;
 	if (num) {
-		ti->_int[ti->_msb++] = num & (BIT(31)-1);
-		num >>= 31;
+		ti->buf[ti->msb++] = num & ~_tt_word_top_bit;
+		num >>= _tt_word_bits;
 		if (num)
-			ti->_int[ti->_msb++] = num;
+			ti->buf[ti->msb++] = num;
 	}
 
 	return 0;
@@ -29,7 +27,7 @@ int tt_int_from_sint(struct tt_int *ti, int64_t num)
 {
 	if (num < 0) {
 		tt_int_from_uint(ti, -num);
-		ti->_sign = 1;
+		ti->sign = 1;
 	} else {
 		tt_int_from_uint(ti, num);
 	}

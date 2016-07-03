@@ -58,12 +58,12 @@ void test_mersenne(void)
 	/* Mersenne number: 2^N - 1 */
 	#define N	521
 	const int n = N + 1;
-	int sz = (n + 30) / 31;
-	uint m[sz+1];
+	int sz = (n + _tt_word_bits - 1) / _tt_word_bits;
+	_tt_word m[sz+1];
 	m[sz] = 0;
 	for (int i = 0; i < sz-1; i++)
-		m[i] = 0x7FFFFFFF;
-	m[sz-1] = (1 << (n - 31*(sz-1) - 1)) - 1;
+		m[i] = ~_tt_word_top_bit;
+	m[sz-1] = (1 << (n - _tt_word_bits*(sz-1) - 1)) - 1;
 	if (m[sz-1] == 0)
 		sz--;
 	struct tt_int ti = _TT_INT_DECL(sz, m);
@@ -79,24 +79,29 @@ void prime_distribute(void)
 {
 	printf("Testing prime distribution...\n");
 
+#ifdef _TT_LP64_
+	#define NN	4
+#else
 	#define NN	8
+#endif
 
-	uint r[NN];
-	struct tt_int ti = {
-		._sign = 0,
-		._max = NN,
-		._int = r,
-	};
+	_tt_word r[NN];
+	struct tt_int ti = _TT_INT_DECL(NN, r);
 
 	/* In theory, there're about 100 primes in pcnt100 tries  */
-	uint pcnt100 = (uint)(log(2.0) * 31.0 * NN * 100.0);
+	uint pcnt100 = (uint)(log(2.0) * _tt_word_bits * NN * 100.0);
 	uint pcnt = 0;
 
 	for (int i = 0; i < pcnt100; i++) {
 		/* Generate random integer with 1 ~ N words */
-		for (int j = 0; j < NN; j++)
+		for (int j = 0; j < NN; j++) {
 			r[j] = _tt_rand() & ~BIT(31);
-		ti._msb = _tt_int_get_msb(r, NN);
+#ifdef _TT_LP64_
+			r[j] <<= 32;
+			r[j] |= _tt_rand();
+#endif
+		}
+		ti.msb = _tt_int_get_msb(r, NN);
 
 		if (tt_int_isprime(&ti))
 			pcnt++;
@@ -112,12 +117,25 @@ struct tt_int *rand_int(int msb)
 	if (_tt_int_realloc(ti, msb))
 		return NULL;
 
-	ti->_msb = msb;
-	for (int i = 0; i < msb-1; i++)
-		ti->_int[i] = _tt_rand() & ~(1<<31);
+	ti->msb = msb;
+#ifdef _TT_LP64_
+	for (int i = 0; i < msb-1; i++) {
+		ti->buf[i] = _tt_rand() & ~(1<<31);
+		ti->buf[i] <<= 32;
+		ti->buf[i] |= _tt_rand();
+	}
 	do {
-		ti->_int[msb-1] = _tt_rand() & ~(1<<31);
-	} while (ti->_int[msb-1] == 0);
+		ti->buf[msb-1] = _tt_rand() & ~(1<<31);
+	} while (ti->buf[msb-1] == 0);
+	ti->buf[msb-1] <<= 32;
+	ti->buf[msb-1] |= _tt_rand();
+#else
+	for (int i = 0; i < msb-1; i++)
+		ti->buf[i] = _tt_rand() & ~(1<<31);
+	do {
+		ti->buf[msb-1] = _tt_rand() & ~(1<<31);
+	} while (ti->buf[msb-1] == 0);
+#endif
 
 	return ti;
 }
@@ -179,7 +197,7 @@ void test_gcd(void)
 	tt_int_to_string(tiu, &u, 10);
 	tt_int_to_string(tiv, &v, 10);
 	printf("%s = ", g);
-	printf("%s * %s %s %s * %s\n", u, a, tiv->_sign?"\b":"+", v, b);
+	printf("%s * %s %s %s * %s\n", u, a, tiv->sign?"\b":"+", v, b);
 
 	free(g);
 	free(u);
@@ -196,7 +214,7 @@ void test_gcd(void)
 void test_mont(int nl)
 {
 	struct tt_int *n = rand_int(nl);
-	n->_int[0] |= 1;
+	n->buf[0] |= 1;
 
 	int l = _tt_rand() % nl;
 	if (l == 0)
@@ -207,16 +225,16 @@ void test_mont(int nl)
 		l = 1;
 	struct tt_int *b = rand_int(l);
 
-	/* lambda = (2^31)^(n->_msb) */
+	/* lambda = (2^31)^(n->msb), (2^63)^(n->msb) */
 	struct tt_int *lambda = tt_int_alloc();
-	_tt_int_realloc(lambda, n->_msb+1);
-	lambda->_int[n->_msb] = 1;
-	lambda->_msb = n->_msb+1;
+	_tt_int_realloc(lambda, n->msb+1);
+	lambda->buf[n->msb] = 1;
+	lambda->msb = n->msb+1;
 
 	/* u = -1/n % lambda */
 	struct tt_int *u = tt_int_alloc();
 	tt_int_mod_inv(u, n, lambda);
-	if (u->_sign == 0)
+	if (u->sign == 0)
 		tt_int_sub(u, lambda, u);
 
 	/* c = (a * b * lambda) % n */
@@ -234,14 +252,14 @@ void test_mont(int nl)
 	/* d = montgomery(a * b) */
 	struct tt_int *d = tt_int_alloc();
 	tt_int_mul(d, a, b);
-	_tt_int_realloc(d, n->_msb*2+1);
+	_tt_int_realloc(d, n->msb*2+1);
 
-	uint *t = malloc((n->_msb+1)*3*4);
-	_tt_int_mont_reduce(d->_int, &d->_msb, d->_int, d->_msb,
-			u->_int, u->_msb, n->_int, n->_msb, t);
+	_tt_word *t = malloc((n->msb+1)*3*_tt_word_sz);
+	_tt_int_mont_reduce(d->buf, &d->msb, d->buf, d->msb,
+			u->buf, u->msb, n->buf, n->msb, t);
 
 	/* c == d? */
-	if (_tt_int_cmp_buf(c->_int, c->_msb, d->_int, d->_msb))
+	if (_tt_int_cmp_buf(c->buf, c->msb, d->buf, d->msb))
 		tt_error("Montgomery failed!");
 
 	free(t);
@@ -259,12 +277,14 @@ int main(void)
 	tt_log_set_level(TT_LOG_WARN);
 
 #if 0
+	test_prime("6118607636866573789");
 	test_prime("31252509122307099513722565100727743481642064519811184448629"
 		   "54305561681091773335180100000000000000000537");
 	test_mersenne();
-	for (int i = 1; i < 3000; i++)
+	for (int i = 1; i < 1000; i++)
 		test_mont(i % 300 + 1);
 #endif
+
 	test_gcd();
 	prime_distribute();
 

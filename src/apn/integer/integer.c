@@ -11,45 +11,41 @@
 
 struct tt_int *tt_int_alloc(void)
 {
-	struct tt_int *ti = calloc(1, sizeof(struct tt_int));
-	*(uint *)&ti->_max = TT_INT_DEF;
-	ti->_msb = 1;
-	ti->_int = calloc(ti->_max, 4);
-	if (ti->_int == NULL) {
+	struct tt_int *ti = malloc(sizeof(struct tt_int));
+	ti->sign = 0;
+	ti->_max = TT_INT_DEF;
+	ti->msb = 1;
+	ti->buf = calloc(ti->_max, sizeof(_tt_word));
+	if (ti->buf == NULL) {
 		tt_error("Out of memory");
 		free(ti);
 		return NULL;
 	}
-	tt_debug("Integer created: %u bytes", ti->_max * 4);
-
 	return ti;
 }
 
 void tt_int_free(struct tt_int *ti)
 {
-	free(ti->_int);
+	free(ti->buf);
 	free(ti);
 }
 
-int _tt_int_realloc(struct tt_int *ti, uint msb)
+int _tt_int_realloc(struct tt_int *ti, int msb)
 {
 	if (msb <= ti->_max)
 		return 0;
 
-	/* Increase half buffer */
-	if (msb < ti->_max * 3 / 2)
-		msb = ti->_max * 3 / 2;
-	tt_assert(msb > ti->_max);
-
-	/* Reallocate buffer */
-	uint *_int = realloc(ti->_int, msb * 4);
-	if (!_int)
+	/* Double the buffer */
+	if (msb < ti->_max * 2)
+		msb = ti->_max * 2;
+	_tt_word *buf = realloc(ti->buf, msb * _tt_word_sz);
+	if (!buf) {
+		tt_error("Out of memory");
 		return TT_ENOMEM;
-	memset(_int + ti->_max, 0, (msb - ti->_max) * 4);
-	ti->_int = _int;
-	*(uint *)&ti->_max = msb;
-	tt_debug("Integer reallocated: %u bytes", msb * 4);
-
+	}
+	memset(buf + ti->_max, 0, (msb - ti->_max) * _tt_word_sz);
+	ti->buf = buf;
+	ti->_max = msb;
 	return 0;
 }
 
@@ -57,51 +53,68 @@ int _tt_int_copy(struct tt_int *dst, const struct tt_int *src)
 {
 	_tt_int_zero(dst);
 
-	int ret = _tt_int_realloc(dst, src->_msb);
+	int ret = _tt_int_realloc(dst, src->msb);
 	if (ret)
 		return ret;
 
-	dst->_sign = src->_sign;
-	dst->_msb = src->_msb;
-	memcpy(dst->_int, src->_int, src->_msb * 4);
-
+	dst->sign = src->sign;
+	dst->msb = src->msb;
+	memcpy(dst->buf, src->buf, src->msb * _tt_word_sz);
 	return 0;
-}
-
-void _tt_int_swap(struct tt_int *ti1, struct tt_int *ti2)
-{
-	struct tt_int ti = *ti1;
-	memcpy(ti1, ti2, sizeof(struct tt_int));
-	memcpy(ti2, &ti, sizeof(struct tt_int));
 }
 
 void _tt_int_zero(struct tt_int *ti)
 {
-	ti->_sign = 0;
-	ti->_msb = 1;
-	memset(ti->_int, 0, ti->_max * 4);
+	ti->sign = 0;
+	ti->msb = 1;
+	memset(ti->buf, 0, ti->_max * _tt_word_sz);
+}
+
+/* Count significant bits of a word(top bit ignored) */
+int _tt_int_word_bits(_tt_word w)
+{
+	w <<= 1;
+	for (int i = _tt_word_bits; i > 0; i--) {
+		if (w & _tt_word_top_bit)
+			return i;
+		w <<= 1;
+	}
+
+	tt_assert(1);
+	return 0;
+}
+
+/* Count trailing zeros of a word(top bit ignored) */
+int _tt_int_word_ctz(_tt_word w)
+{
+	for (int i = 0; i < _tt_word_bits; i++) {
+		if (w & 0x1)
+			return i;
+		w >>= 1;
+	}
+
+	tt_assert(1);
+	return _tt_word_bits;
 }
 
 /* Check sanity */
 int _tt_int_sanity(const struct tt_int *ti)
 {
-	uint i;
-
-	if (ti->_msb == 0 || ti->_msb > ti->_max)
+	if (ti->msb == 0 || ti->msb > ti->_max)
 		return TT_APN_ESANITY;
 
 	/* Check significands */
-	if (ti->_msb > 1 && ti->_int[ti->_msb-1] == 0)
+	if (ti->msb > 1 && ti->buf[ti->msb-1] == 0)
 		return TT_APN_ESANITY;
 
 	/* Check carry guard bit */
-	for (i = 0; i < ti->_msb; i++)
-		if ((ti->_int[i] & BIT(31)))
+	for (int i = 0; i < ti->msb; i++)
+		if ((ti->buf[i] & _tt_word_top_bit))
 			return TT_APN_ESANITY;
 
-	/* Check unused uints */
-	for (; i < ti->_max; i++)
-		if (ti->_int[i])
+	/* Check unused high words */
+	for (int i = ti->msb; i < ti->_max; i++)
+		if (ti->buf[i])
 			return TT_APN_ESANITY;
 
 	return 0;
@@ -115,7 +128,7 @@ void _tt_int_print(const struct tt_int *ti)
 	free(s);
 }
 
-void _tt_int_print_buf(const uint *ui, int msb)
+void _tt_int_print_buf(const _tt_word *ui, int msb)
 {
 	struct tt_int ti = _TT_INT_DECL(msb, ui);
 	_tt_int_print(&ti);
@@ -123,57 +136,59 @@ void _tt_int_print_buf(const uint *ui, int msb)
 
 /* Shift integer
  * - shift: + left, - right
- * - _int buffer must be large enough
+ * - buf must be large enough to hold left shifted result
  * - return new msb
  * - fill empty space with zero
  */
-int _tt_int_shift_buf(uint *_int, int msb, int shift)
+int _tt_int_shift_buf(_tt_word *buf, int msb, int shift)
 {
-	int sh_uints, sh_bits;
-	uint tmp = 0, tmp2;
+	int sh_words, sh_bits;
+	_tt_word tmp = 0, tmp2;
 
 	if (shift > 0) {
-		sh_uints = shift / 31;
-		sh_bits = shift % 31;
+		sh_words = shift / _tt_word_bits;
+		sh_bits = shift % _tt_word_bits;
 
-		if (sh_uints) {
-			memmove(_int+sh_uints, _int, msb*4);
-			memset(_int, 0, sh_uints*4);
-			msb += sh_uints;
+		if (sh_words) {
+			memmove(buf+sh_words, buf, msb*_tt_word_sz);
+			memset(buf, 0, sh_words*_tt_word_sz);
+			msb += sh_words;
 		}
 
 		if (sh_bits) {
-			for (int i = sh_uints; i < msb; i++) {
-				tmp2 = _int[i];
-				_int[i] = ((_int[i] << sh_bits) | tmp) & ~BIT(31);
-				tmp = tmp2 >> (31 - sh_bits);
+			for (int i = sh_words; i < msb; i++) {
+				tmp2 = buf[i];
+				buf[i] = ((buf[i] << sh_bits) | tmp) &
+					~_tt_word_top_bit;
+				tmp = tmp2 >> (_tt_word_bits-sh_bits);
 			}
 			if (tmp)
-				_int[msb++] = tmp;
+				buf[msb++] = tmp;
 		}
 	} else if (shift < 0) {
 		shift = -shift;
-		sh_uints = shift / 31;
-		sh_bits = shift % 31;
+		sh_words = shift / _tt_word_bits;
+		sh_bits = shift % _tt_word_bits;
 
-		if (sh_uints >= msb) {
-			memset(_int, 0, msb*4);
+		if (sh_words >= msb) {
+			memset(buf, 0, msb*_tt_word_sz);
 			return 1;
 		}
 
-		if (sh_uints) {
-			memmove(_int, _int+sh_uints, (msb-sh_uints)*4);
-			memset(_int+msb-sh_uints, 0, sh_uints*4);
-			msb -= sh_uints;
+		if (sh_words) {
+			memmove(buf, buf+sh_words, (msb-sh_words)*_tt_word_sz);
+			memset(buf+msb-sh_words, 0, sh_words*_tt_word_sz);
+			msb -= sh_words;
 		}
 
 		if (sh_bits) {
 			for (int i = msb-1; i >= 0; i--) {
-				tmp2 = _int[i];
-				_int[i] = (_int[i] >> sh_bits) | tmp;
-				tmp = (tmp2 << (31 - sh_bits)) & ~BIT(31);
+				tmp2 = buf[i];
+				buf[i] = (buf[i] >> sh_bits) | tmp;
+				tmp = (tmp2 << (_tt_word_bits-sh_bits)) &
+					~_tt_word_top_bit;
 			}
-			if (_int[msb-1] == 0 && msb > 1)
+			if (buf[msb-1] == 0 && msb > 1)
 				msb--;
 		}
 	}
@@ -185,11 +200,12 @@ int _tt_int_shift_buf(uint *_int, int msb, int shift)
 int tt_int_shift(struct tt_int *ti, int shift)
 {
 	if (shift > 0) {
-		int ret = _tt_int_realloc(ti, ti->_msb + (shift+30)/31);
+		int ret = _tt_int_realloc(ti, ti->msb +
+				(shift+_tt_word_bits-1)/_tt_word_bits);
 		if (ret)
 			return ret;
 	}
 
-	ti->_msb = _tt_int_shift_buf(ti->_int, ti->_msb, shift);
+	ti->msb = _tt_int_shift_buf(ti->buf, ti->msb, shift);
 	return 0;
 }

@@ -24,35 +24,36 @@ int tt_int_mod_inv(struct tt_int *m,
 	return ret;
 }
 
-/* Montgomery reduce (beta = 2^31, lambda = beta^msbn)
- * - r: result, may share buffer with c, size >= (msbn+1) uints
+/* Montgomery reduce (beta = 2^31 or 2^63, lambda = beta^msbn)
+ * - r: result, may share buffer with c, size >= (msbn+1) words
  * - c: to be reduced
  * - u: -1/n % lambda
  * - n: modulus
- * - t: temp buffer, size >= 3*(msbn+1) uints
+ * - t: temp buffer, size >= 3*(msbn+1) words
  */
-int _tt_int_mont_reduce(uint *r, int *msbr, const uint *c, int msbc,
-		const uint *u, int msbu, const uint *n, int msbn, uint *t)
+int _tt_int_mont_reduce(_tt_word *r, int *msbr, const _tt_word *c, int msbc,
+		const _tt_word *u, int msbu, const _tt_word *n, int msbn,
+		_tt_word *t)
 {
 	tt_assert_fa(msbc <= msbn*2);
 
 	/* q = u*c % lambda */
-	uint *q = t;
-	memset(q, 0, msbn*2*4);
+	_tt_word *q = t;
+	memset(q, 0, msbn*2*_tt_word_sz);
 	int msbq = _tt_int_mul_buf(q, u, msbu, c, _tt_min(msbc, msbn));
 	if (msbq > msbn)
 		msbq = _tt_int_get_msb(q, msbn);
 	/* Q = c + q*n */
-	uint *Q = q + msbq;
-	memset(Q, 0, msbn*2*4);
+	_tt_word *Q = q + msbq;
+	memset(Q, 0, msbn*2*_tt_word_sz);
 	int msbQ = _tt_int_mul_buf(Q, q, msbq, n, msbn);
 	msbQ = _tt_int_add_buf(Q, msbQ, c, msbc);
 	/* r = Q / lambda */
-	memset(r, 0, (msbn+1)*4);
+	memset(r, 0, (msbn+1)*_tt_word_sz);
 	*msbr = 1;
 	if (msbQ > msbn) {
 		*msbr = msbQ - msbn;
-		memcpy(r, Q+msbn, (*msbr)*4);
+		memcpy(r, Q+msbn, (*msbr)*_tt_word_sz);
 	}
 	if (_tt_int_cmp_buf(r, *msbr, n, msbn) >= 0)
 		*msbr = _tt_int_sub_buf(r, *msbr, n, msbn);
@@ -60,4 +61,30 @@ int _tt_int_mont_reduce(uint *r, int *msbr, const uint *c, int msbc,
 	tt_assert_fa(_tt_int_cmp_buf(r, *msbr, n, msbn) < 0);
 
 	return 0;
+}
+
+/* Return dd[] % ds */
+uint _tt_int_mod_uint(const _tt_word *dd, int msb, uint ds)
+{
+	uint64_t rm = 0;
+
+	dd += (msb - 1);
+	while (msb--) {
+#ifdef _TT_LP64_
+		uint64_t w = *dd--;
+
+		rm <<= 31;
+		rm |= w >> 32;
+		rm %= ds;
+
+		rm <<= 32;
+		rm |= (uint)w;
+		rm %= ds;
+#else
+		rm <<= 31;
+		rm |= *dd--;
+		rm %= ds;
+#endif
+	}
+	return rm;
 }

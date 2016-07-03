@@ -210,7 +210,7 @@ static void verify_mul_div(int count)
 		tt_int_from_string(b, str);
 		free(str);
 
-		if (a->_msb < b->_msb) {
+		if (a->msb < b->msb) {
 			void *t = a;
 			a = b;
 			b = t;
@@ -250,12 +250,25 @@ struct tt_int *rand_int(int msb)
 	if (_tt_int_realloc(ti, msb))
 		return NULL;
 
-	ti->_msb = msb;
-	for (int i = 0; i < msb-1; i++)
-		ti->_int[i] = rand() & ~(1<<31);
+	ti->msb = msb;
+#ifdef _TT_LP64_
+	for (int i = 0; i < msb-1; i++) {
+		ti->buf[i] = rand() & ~(1<<31);
+		ti->buf[i] <<= 32;
+		ti->buf[i] |= rand();
+	}
 	do {
-		ti->_int[msb-1] = rand() & ~(1<<31);
-	} while (ti->_int[msb-1] == 0);
+		ti->buf[msb-1] = rand() & ~(1<<31);
+	} while (ti->buf[msb-1] == 0);
+	ti->buf[msb-1] <<= 32;
+	ti->buf[msb-1] |= rand();
+#else
+	for (int i = 0; i < msb-1; i++)
+		ti->buf[i] = rand() & ~(1<<31);
+	do {
+		ti->buf[msb-1] = rand() & ~(1<<31);
+	} while (ti->buf[msb-1] == 0);
+#endif
 
 	return ti;
 }
@@ -270,22 +283,39 @@ void gen_exp10(int e)
 	struct tt_int *ti = tt_int_alloc();
 	tt_int_from_string(ti, s);
 
-	const int shift = __builtin_clz(ti->_int[ti->_msb-1]) - 1;
+	int c = 0;
+	_tt_word sh = 0;
+	const int shift = _tt_word_bits - _tt_int_word_bits(ti->buf[ti->msb-1]);
 	printf("#define dec9_shift_%d\t%d\n", e/9, shift);
 
-	int c = 0, sh = 0;
-	printf("static const uint dec9_norm_%d[] = {", e/9);
-	for (int i = 0; i < ti->_msb; i++) {
+#ifdef _TT_LP64_
+	printf("static const uint64_t dec9_norm_%d[] = {", e/9);
+	for (int i = 0; i < ti->msb; i++) {
 		if (c == 0)
 			printf("\n\t");
-		printf("0x%08X,", ((ti->_int[i] << shift) | sh) & ~(1 << 31));
-		sh = ti->_int[i] >> (31 - shift);
+		printf("0x%016llX,",
+				((ti->buf[i] << shift) | sh) & ~(1ULL << 63));
+		sh = ti->buf[i] >> (63 - shift);
+		c++;
+		if (c == 3)
+			c = 0;
+		else
+			printf(" ");
+	}
+#else
+	printf("static const uint dec9_norm_%d[] = {", e/9);
+	for (int i = 0; i < ti->msb; i++) {
+		if (c == 0)
+			printf("\n\t");
+		printf("0x%08X,", ((ti->buf[i] << shift) | sh) & ~(1 << 31));
+		sh = ti->buf[i] >> (31 - shift);
 		c++;
 		if (c == 6)
 			c = 0;
 		else
 			printf(" ");
 	}
+#endif
 	printf("\n};\n\n");
 }
 
@@ -294,19 +324,8 @@ int main(void)
 	srand(time(NULL));
 
 #if 0
-	struct tt_int *ti = tt_int_alloc();
-
-	tt_int_from_string(ti, "1267650600228229401496703205375");
-	for (int i = 0; i < ti->_msb; i++)
-		printf("%08x\n", ti->_int[i]);
-	assert(_tt_int_sanity(ti) == 0);
-
 	char *s = NULL;
-	tt_int_to_string(ti, &s, 10);
-	printf("%s\n", s);
-	free(s);
-	s = NULL;
-
+	struct tt_int *ti = tt_int_alloc();
 	struct tt_int *ti1 = tt_int_alloc();
 	struct tt_int *ti2 = tt_int_alloc();
 	tt_int_from_string(ti1, "-1111111111111111111111111111111111111111111");
@@ -351,7 +370,7 @@ int main(void)
 	int old_level = tt_log_set_level(TT_LOG_INFO);
 	tt_info("Calculating...");
 	struct tt_int *ti = tt_int_alloc();
-	tt_int_factorial(ti, 100000);
+	tt_int_factorial(ti, 1000000);
 	char *s = NULL;
 	tt_info("Converting...");
 	tt_int_to_string(ti, &s, 10);
