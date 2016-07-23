@@ -68,7 +68,7 @@ uint _tt_rand(void)
 
 	pthread_mutex_lock(&_mtx);
 	if (_si == -1)
-		__tt_srand(time(NULL));
+		__tt_srand(clock());
 	r = __tt_rand();
 	pthread_mutex_unlock(&_mtx);
 

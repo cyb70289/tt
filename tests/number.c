@@ -10,6 +10,8 @@
 #include <string.h>
 #include <math.h>
 
+#include <apn/integer/prime-tbl.c>
+
 void test_prime(const char *s)
 {
 	struct tt_int *ti = tt_int_alloc();
@@ -53,6 +55,30 @@ void nth_prime(uint n)
 	tt_int_free(two);
 }
 
+#if 0
+void prime_inverse(void)
+{
+	struct tt_int *m = tt_int_alloc();
+
+	struct tt_int *a = tt_int_alloc();
+	a->msb = 1;
+
+	_tt_word beta[2] = { 0, 1 };
+	struct tt_int b = _TT_INT_DECL(2, beta);
+
+	printf("0\n");
+	for (int i = 1; i < sizeof(_primes)/sizeof(_primes[0]); i++) {
+		a->buf[0] = _primes[i];
+		tt_int_mod_inv(m, a, &b);
+		tt_assert(m->sign == 0);
+		printf("%llu\n", (unsigned long long)m->buf[0]);
+	}
+
+	tt_int_free(m);
+	tt_int_free(a);
+}
+#endif
+
 void test_mersenne(void)
 {
 	/* Mersenne number: 2^N - 1 */
@@ -79,11 +105,7 @@ void prime_distribute(void)
 {
 	printf("Testing prime distribution...\n");
 
-#ifdef _TT_LP64_
-	#define NN	4
-#else
 	#define NN	8
-#endif
 
 	_tt_word r[NN];
 	struct tt_int ti = _TT_INT_DECL(NN, r);
@@ -272,6 +294,44 @@ void test_mont(int nl)
 	tt_int_free(d);
 }
 
+/* Generate prime, return msb */
+int gen_prime(int bits, _tt_word **pp)
+{
+	int msb = (bits+_tt_word_bits-1)/_tt_word_bits;
+	tt_assert(msb >= 2);
+
+	bits %= _tt_word_bits;
+	*pp = malloc(msb*_tt_word_sz);
+	_tt_word *p = *pp;
+
+	while (1) {
+		for (int i = 0; i < msb; i++) {
+			p[i] = _tt_rand() & ~BIT(31);
+#ifdef _TT_LP64_
+			p[i] <<= 32;
+			p[i] |= _tt_rand();
+#endif
+		}
+		/* Set highest two bits and lowest bit */
+		p[0] |= 0x1;
+		if (bits == 0) {
+			p[msb-1] |= (_tt_word_top_bit >> 1) |
+				(_tt_word_top_bit >> 2);
+		} else if (bits == 1) {
+			p[msb-1] = 1;
+			p[msb-2] |= _tt_word_top_bit >> 1;
+		} else {
+			p[msb-1] |= 0x3ULL << (bits-2);
+			p[msb-1] &= (1ULL << bits) - 1;
+		}
+
+		if (_tt_int_isprime_buf(p, msb))
+			break;
+	}
+
+	return msb;
+}
+
 int main(void)
 {
 	tt_log_set_level(TT_LOG_WARN);
@@ -283,6 +343,14 @@ int main(void)
 	test_mersenne();
 	for (int i = 1; i < 1000; i++)
 		test_mont(i % 300 + 1);
+#endif
+
+#if 0
+	_tt_word *p;
+	for (int i = 0; i < 100; i++)
+		gen_prime(1024, &p);
+	free(p);
+	return 0;
 #endif
 
 	test_gcd();

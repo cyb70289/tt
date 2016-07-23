@@ -59,8 +59,7 @@ int _tt_int_cmp_buf(const _tt_word *int1, int msb1,
 		const _tt_word *int2, int msb2);
 int _tt_int_get_msb(const _tt_word *ui, int len);
 
-bool _tt_int_isprime_buf(const _tt_word *ui, int msb, int rounds);
-int _tt_int_ml_rounds(int bits);	/* Miller-Rabin test rounds */
+bool _tt_int_isprime_buf(const _tt_word *ui, int msb);
 int _tt_int_mont_reduce(_tt_word *r, int *msbr, const _tt_word *c, int msbc,
 		const _tt_word *u, int msbu, const _tt_word *n, int msbn,
 		_tt_word *t);

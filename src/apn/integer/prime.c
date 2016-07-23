@@ -9,6 +9,8 @@
 
 #include <string.h>
 
+#include "prime-tbl.c"
+
 /* Naive algorithm (p < 2^31) */
 static bool isprime_naive(uint p)
 {
@@ -25,6 +27,69 @@ static bool isprime_naive(uint p)
 	}
 
 	return true;
+}
+
+/* Test if ui is divisable by a word
+ * - prime cannot be 2
+ * - inverse = 1/prime mod beta (beta = 2^31 or 2^63)
+ * - From "Modern Computer Arithmetic"
+ */
+static bool divisable(const _tt_word *ui, int msb, uint prime, _tt_word inverse)
+{
+#if 1
+	_tt_word x, q;
+	uint b = 0;
+
+	for (int i = 0; i < msb; i++) {
+		if (b <= ui[i]) {
+			x = ui[i] - b;
+			b = 0;
+		} else {
+			x = ~(b - ui[i]) + 1;
+			x &= ~_tt_word_top_bit;
+			b = 1;
+		}
+
+		q = inverse * x;
+		q &= ~_tt_word_top_bit;
+
+		b += ((_tt_word_double)q * prime - x) >> _tt_word_bits;
+	}
+	return b == 0;
+#else
+	return _tt_int_mod_uint(ui, msb, prime) == 0;
+#endif
+}
+
+/* Test primality by mod small primes */
+static bool maybe_prime(const _tt_word *ui, int msb)
+{
+	for (int i = 1; i < PRIMES_COUNT; i++) {
+		if (divisable(ui, msb, _primes[i], _inverse[i]))
+			return false;
+	}
+	return true;
+}
+
+/* Miller-Rabin test rounds to achieve 2^-80 error bound
+ * - From "Handbook of Applied Cryptography"
+ */
+static int ml_rounds(int bits)
+{
+	static const struct {
+		int bits;
+		int rounds;
+	} b2r[] = {
+		{ 1300, 2 }, { 850, 3 }, { 650, 4 }, { 550, 5 }, { 450, 6 },
+		{ 400, 7 }, { 350, 8 }, { 300, 9 }, { 250, 12 }, { 200, 15 },
+		{ 150, 18 }, { 0, 27 },
+	};
+
+	for (int i = 0; i < ARRAY_SIZE(b2r); i++) {
+		if (bits >= b2r[i].bits)
+			return b2r[i].rounds;
+	}
+	return b2r[0].rounds;
 }
 
 /* Miller-Rabin algorithm
@@ -217,19 +282,23 @@ static bool isprime_miller_rabin(const _tt_word *n, int msbn, int rounds)
 	return ret;
 }
 
-bool _tt_int_isprime_buf(const _tt_word *ui, int msb, int rounds)
+bool _tt_int_isprime_buf(const _tt_word *ui, int msb)
 {
 	if (msb == 1 && ui[0] < BIT(31))
 		return isprime_naive(ui[0]);
+
 	if ((ui[0] & 0x1) == 0)
 		return false;
-	return isprime_miller_rabin(ui, msb, rounds);
+
+	if (!maybe_prime(ui, msb))
+		return false;
+
+	int bits = (msb - 1) * _tt_word_bits;
+	bits += _tt_int_word_bits(ui[msb-1]);
+	return isprime_miller_rabin(ui, msb, ml_rounds(bits));
 }
 
 bool tt_int_isprime(const struct tt_int *ti)
 {
-	int bits = (ti->msb - 1) * _tt_word_bits;
-	bits += _tt_int_word_bits(ti->buf[ti->msb-1]);
-
-	return _tt_int_isprime_buf(ti->buf, ti->msb, _tt_int_ml_rounds(bits));
+	return _tt_int_isprime_buf(ti->buf, ti->msb);
 }
