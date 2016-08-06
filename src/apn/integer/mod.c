@@ -37,7 +37,7 @@ int _tt_int_mont_reduce(_tt_word *r, int *msbr, const _tt_word *c, int msbc,
 {
 	tt_assert_fa(msbc <= msbn*2);
 
-	/* q = u*c % lambda */
+	/* q = u*c % lambda (TODO: drop 1/4 calculation) */
 	_tt_word *q = t;
 	memset(q, 0, msbn*2*_tt_word_sz);
 	int msbq = _tt_int_mul_buf(q, u, msbu, c, _tt_min(msbc, msbn));

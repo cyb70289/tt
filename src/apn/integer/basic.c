@@ -59,7 +59,7 @@ static int add_ints_abs(struct tt_int *dst, const struct tt_int *src1,
 	}
 	dst->msb = src1->msb;
 
-	/* Add uint array */
+	/* Add array */
 	int i, carry = 0;
 	for (i = 0; i < src2->msb; i++)
 		dst->buf[i] = add_int(src1->buf[i], src2->buf[i], &carry);
@@ -94,7 +94,7 @@ static int sub_ints_abs(struct tt_int *dst, const struct tt_int *src1,
 			return ret;
 	}
 
-	/* Sub uint array */
+	/* Sub array */
 	int i, borrow = 0;
 	for (i = 0; i < src2->msb; i++)
 		dst->buf[i] = sub_int(src1->buf[i], src2->buf[i], &borrow);
@@ -289,7 +289,11 @@ static int mul_buf_classic(_tt_word *intr, const _tt_word *int1, int msb1,
 			r++;
 		}
 	} else {
-		if (msb1 > msb2) {
+		bool swap = msb1 < msb2;
+#ifndef _TT_LP64_
+		swap = !swap;
+#endif
+		if (swap) {
 			__tt_swap(msb1, msb2);
 			__tt_swap(int1, int2);
 		}
@@ -793,7 +797,7 @@ out:
 
 /* Divide: qt = dd / ds; rm = dd % ds
  * - dividend >= divisor
- * - divisor is normalized (if msb_ds > 1)
+ * - divisor must be normalized
  * - qt: quotient, zeroed, size = max_quotient_words + 1
  * - rm: remainder, zeroed, size = max_remainder_words + 1
  * - msb_qt/msb_rm: quotient/remainder msb
