@@ -63,4 +63,3 @@ bool _tt_int_isprime_buf(const _tt_word *ui, int msb);
 int _tt_int_mont_reduce(_tt_word *r, int *msbr, const _tt_word *c, int msbc,
 		const _tt_word *u, int msbu, const _tt_word *n, int msbn,
 		_tt_word *t);
-uint _tt_int_mod_uint(const _tt_word *dd, int msb, uint ds);

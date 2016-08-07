@@ -36,7 +36,6 @@ static bool isprime_naive(uint p)
  */
 static bool divisable(const _tt_word *ui, int msb, uint prime, _tt_word inverse)
 {
-#if 1
 	_tt_word x, q;
 	uint b = 0;
 
@@ -56,9 +55,6 @@ static bool divisable(const _tt_word *ui, int msb, uint prime, _tt_word inverse)
 		b += ((_tt_word_double)q * prime - x) >> _tt_word_bits;
 	}
 	return b == 0;
-#else
-	return _tt_int_mod_uint(ui, msb, prime) == 0;
-#endif
 }
 
 /* Test primality by mod small primes */

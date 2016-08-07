@@ -62,29 +62,3 @@ int _tt_int_mont_reduce(_tt_word *r, int *msbr, const _tt_word *c, int msbc,
 
 	return 0;
 }
-
-/* Return dd[] % ds */
-uint _tt_int_mod_uint(const _tt_word *dd, int msb, uint ds)
-{
-	uint64_t rm = 0;
-
-	dd += (msb - 1);
-	while (msb--) {
-#ifdef _TT_LP64_
-		uint64_t w = *dd--;
-
-		rm <<= 31;
-		rm |= w >> 32;
-		rm %= ds;
-
-		rm <<= 32;
-		rm |= (uint)w;
-		rm %= ds;
-#else
-		rm <<= 31;
-		rm |= *dd--;
-		rm %= ds;
-#endif
-	}
-	return rm;
-}
